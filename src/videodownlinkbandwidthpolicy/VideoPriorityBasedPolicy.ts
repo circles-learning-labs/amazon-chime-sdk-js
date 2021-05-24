@@ -744,15 +744,18 @@ export default class VideoPriorityBasedPolicy implements VideoDownlinkBandwidthP
     let priority = highestPriority;
     while (priority !== -1) {
       nextPriority = -1;
+      console.log(`CIRCLES:::::priorityPolicy. Current priority ${priority}`)
       for (const preference of videoPreferences) {
         if (preference.priority === priority) {
           // First subscribe to at least low rate
           for (const info of remoteInfos) {
             if (info.attendeeId === preference.attendeeId) {
+              console.log(`CIRCLES:::::priorityPolicy. Scanning stream. attendee: ${info.attendeeId}, group: ${info.groupId}, stream: ${info.streamId}, ssrc:${info.ssrc}, avg Bitrate: ${info.avgBitrateKbps} of max ${info.maxBitrateKbps} (target: ${rates.chosenTotalBitrate} of ${rates.targetDownlinkBitrate}) `);
               if (!chosenStreams.some(stream => stream.groupId === info.groupId)) {
                 if (rates.chosenTotalBitrate + info.avgBitrateKbps <= rates.targetDownlinkBitrate) {
                   chosenStreams.push(info);
                   rates.chosenTotalBitrate += info.avgBitrateKbps;
+                  console.log(`CIRCLES:::::priorityPolicy. SELECTED stream. attendee: ${info.attendeeId}, group: ${info.groupId}, stream: ${info.streamId}, ssrc:${info.ssrc}, avg Bitrate: ${info.avgBitrateKbps} of max ${info.maxBitrateKbps} (target: ${rates.chosenTotalBitrate} of ${rates.targetDownlinkBitrate}) `);
                 } else if (rates.deltaToNextUpgrade === 0) {
                   // Keep track of step to next upgrade
                   rates.deltaToNextUpgrade = info.avgBitrateKbps;
@@ -799,6 +802,7 @@ export default class VideoPriorityBasedPolicy implements VideoDownlinkBandwidthP
                   if (rates.chosenTotalBitrate + increaseKbps <= rates.targetDownlinkBitrate) {
                     rates.chosenTotalBitrate += increaseKbps;
                     chosenStreams[index] = info;
+                    console.log(`CIRCLES:::::priorityPolicy. UPGRADE stream. attendee: ${info.attendeeId}, group: ${info.groupId}, stream: ${info.streamId}, ssrc:${info.ssrc}, avg Bitrate: ${info.avgBitrateKbps} of max ${info.maxBitrateKbps} (target: ${rates.chosenTotalBitrate} of ${rates.targetDownlinkBitrate}) `);
                   } else if (rates.deltaToNextUpgrade === 0) {
                     // Keep track of step to next upgrade
                     rates.deltaToNextUpgrade = increaseKbps;

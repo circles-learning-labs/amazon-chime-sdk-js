@@ -13,13 +13,27 @@ import BitrateParameters from './BitrateParameters';
 import ConnectionMetrics from './ConnectionMetrics';
 import SimulcastUplinkObserver from './SimulcastUplinkObserver';
 import SimulcastUplinkPolicy from './SimulcastUplinkPolicy';
+import BandwidthPolicy  from './BandwidthPolicy'; 
+import {ActiveStreams} from './BandwidthPolicyRule'; 
+import BandwidthPolicyRule from './BandwidthPolicyRule'
 
+declare global {
+  // Since any uplink policy we set gets overridden by the chime connect function
+  // we need a way to configure our policy. This is dirty, but we look for teh global variable.
+  // Later, we can pass this in as part of the configuration; but for now we want to be able
+  // to change it on the fly for easy testing.
+  var SELECTED_BANDWIDTH_POLICY : BandwidthPolicy
+}
+
+
+/* Moved to BandwidthPolicyRules.ts
 const enum ActiveStreams {
   kHi,
   kHiAndLow,
   kMidAndLow,
   kLow,
 }
+*/
 
 /**
  * [[DefaultSimulcastUplinkPolicy]] determines capture and encode
@@ -128,6 +142,7 @@ export default class DefaultSimulcastUplinkPolicy implements SimulcastUplinkPoli
       this.lastUplinkBandwidthKbps >= hysteresisIncrease ||
       this.lastUplinkBandwidthKbps <= hysteresisDecrease
     ) {
+      /*
       if (this.numParticipants >= 0 && this.numParticipants <= 2) {
         // Simulcast disabled
         this.newActiveStreams = ActiveStreams.kHi;
@@ -156,6 +171,13 @@ export default class DefaultSimulcastUplinkPolicy implements SimulcastUplinkPoli
         newBitrates[1].maxBitrateKbps = 0;
         newBitrates[2].maxBitrateKbps = 0;
       }
+      */
+      let policy:BandwidthPolicyRule = window.SELECTED_BANDWIDTH_POLICY.FindPolicyMatch(this.numSenders, this.lastUplinkBandwidthKbps );
+      this.newActiveStreams = policy.ActiveStreams()
+      newBitrates[0].maxBitrateKbps = policy.lowStreamBitrate
+      newBitrates[1].maxBitrateKbps = policy.mediumStreamBitrate
+      newBitrates[2].maxBitrateKbps = policy.highStreamBitrate
+
       const bitrates: number[] = newBitrates.map((v, _i, _a) => {
         return v.maxBitrateKbps;
       });

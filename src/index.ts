@@ -22,6 +22,8 @@ import AudioVideoFacade from './audiovideofacade/AudioVideoFacade';
 import AudioVideoObserver from './audiovideoobserver/AudioVideoObserver';
 import Backoff from './backoff/Backoff';
 import BackoffFactory from './backoff/BackoffFactory';
+import BandwidthPolicy from './videouplinkbandwidthpolicy/BandwidthPolicy';
+import BandwidthPolicyRule from './videouplinkbandwidthpolicy/BandwidthPolicyRule';
 import BaseConnectionHealthPolicy from './connectionhealthpolicy/BaseConnectionHealthPolicy';
 import BaseTask from './task/BaseTask';
 import BitrateParameters from './videouplinkbandwidthpolicy/BitrateParameters';
@@ -36,6 +38,7 @@ import CheckNetworkTCPConnectivityFeedback from './meetingreadinesschecker/Check
 import CheckNetworkUDPConnectivityFeedback from './meetingreadinesschecker/CheckNetworkUDPConnectivityFeedback';
 import CheckVideoConnectivityFeedback from './meetingreadinesschecker/CheckVideoConnectivityFeedback';
 import CheckVideoInputFeedback from './meetingreadinesschecker/CheckVideoInputFeedback';
+import CirclesSimulcastUplinkPolicy from './videouplinkbandwidthpolicy/CirclesSimulcastUplinkPolicy';
 import CleanRestartedSessionTask from './task/CleanRestartedSessionTask';
 import CleanStoppedSessionTask from './task/CleanStoppedSessionTask';
 import ClientMetricReport from './clientmetricreport/ClientMetricReport';
@@ -295,6 +298,8 @@ export {
   AudioVideoObserver,
   Backoff,
   BackoffFactory,
+  BandwidthPolicy,
+  BandwidthPolicyRule,
   BaseConnectionHealthPolicy,
   BaseTask,
   BitrateParameters,
@@ -309,6 +314,7 @@ export {
   CheckNetworkUDPConnectivityFeedback,
   CheckVideoConnectivityFeedback,
   CheckVideoInputFeedback,
+  CirclesSimulcastUplinkPolicy,
   CleanRestartedSessionTask,
   CleanStoppedSessionTask,
   ClientMetricReport,
