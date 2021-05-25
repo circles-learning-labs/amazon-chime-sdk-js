@@ -15,7 +15,7 @@
     "npm": "^6 || ^7 || ^8"
   },
   "scripts": {
-    "install": "npm run build",
+    "prepare": "npm run build",
     "clean": "rm -rf .nyc_output build node_modules",
     "copy": "node script/copy-protocol.js",
     "check": "node script/check-code-style.js",
@@ -26,7 +26,6 @@
     "tsc:watch": "tsc --build --watch config/tsconfig.json",
     "tsc:src": "tsc --build config/tsconfig.json",
     "build": "node script/barrelize.js && node script/generate-version.js && npm run tsc:src && npm run tsc:guides && npm run copy",
-    "prebuild": "script/conditional-install",
     "prebuild:release": "node script/check-voice-focus-version.js && script/prebuild",
     "build:release": "npm run build && npm run lint && npm run check && npm run doc && npm run test:retry",
     "postbuild:release": "script/postbuild",
