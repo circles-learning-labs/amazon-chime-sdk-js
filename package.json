@@ -13,7 +13,7 @@
     "npm": "^6 || ^7"
   },
   "scripts": {
-    "prepare": "npm run build", // Ensure that for installs direct from github, we build the project prior to install.
+    "prepare": "npm run build", 
     "clean": "rm -rf .nyc_output build node_modules",
     "copy": "node script/copy-protocol.js",
     "check": "node script/check-code-style.js",
