@@ -6,15 +6,15 @@ import BandwidthPolicyRule from './BandwidthPolicyRule';
 	and high quality stream bitrate.
 
 	This replaces the hardcoded if/then/else block in the chime default simulcast uplink policy.
-	It can also be changes on the fly.
+	It can also be changed on the fly.
 
 	A sample default policy that roughly replicates the old chime if/else block is given below as 
 	ChimeDefaultPolicy()
 
 	A bandwidth policy is a list that is processed from the start, one rule at a time, till a match
 	is found.
-	A match is identified with the number of senders in the meeting is less than or equal to the number
-	of senders in the rule, and the uplink bitrate is less than or equal the number defined in the rule.
+	A match is identified when the number of senders in the meeting is less than or equal to the number
+	of senders in the rule, and the uplink bitrate is less than or equal to the number defined in the rule.
 
 	Then the rule has 3 values that is the bitrate for each of the simulcast streams: low, medium and high.
 	A bitrate of 0 means that stream is disabled.
@@ -27,10 +27,10 @@ import BandwidthPolicyRule from './BandwidthPolicyRule';
 */
 
 export default class BandwidthPolicy {
-	rules:Array<BandwidthPolicyRule> = []
+	rules:Array<BandwidthPolicyRule> = [];
 
 	constructor(rules:Array<BandwidthPolicyRule>) {
-		this.rules = rules
+		this.rules = rules;
 	}
 
 
@@ -42,7 +42,7 @@ export default class BandwidthPolicy {
 			if (rule.Match(number_participants, uplinkBitrate))
 			{
 				console.log("BANDWIDTH POLICY MATCH: Tested with " + number_participants + " participants with bitrate of " + uplinkBitrate + " and got a result: \t" + rule )
-				return rule
+				return rule;
 			}
 		}	
 		// Policy not found. This shouldn't ever happen. Return a default low quality policy
@@ -52,9 +52,9 @@ export default class BandwidthPolicy {
 
 	TestPolicy( number_participants:number, uplinkBitrate:number)
 	{
-		let rule = this.FindPolicyMatch(number_participants, uplinkBitrate)
+		let rule = this.FindPolicyMatch(number_participants, uplinkBitrate);
 
-		console.log("Tested with " + number_participants + " participants with bitrate of " + uplinkBitrate + " and got a result: \t" + rule )
+		console.log("Tested with " + number_participants + " participants with bitrate of " + uplinkBitrate + " and got a result: \t" + rule );
 	}
 
 
