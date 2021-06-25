@@ -167,6 +167,7 @@ export default class MonitorTask
   }
 
   private checkResubscribe(clientMetricReport: ClientMetricReport): boolean {
+<<<<<<< HEAD
     if (this.isResubscribeCheckPaused) {
       this.context.logger.info(
         'Resubscribe check is paused, setting incoming client metric report as pending'
@@ -175,6 +176,17 @@ export default class MonitorTask
       return;
     } else {
       this.pendingMetricsReport = undefined;
+=======
+
+    if (this.context.audioVideoController.isConnecting || this.context.audioVideoController.isUpdating ) {
+      // Avoid accidentally updating the state in the middle of subscribing
+      // to streams in the first place during initial connection.
+      this.logger.info("Deferring resubscribe checks while connecting");
+      return false;
+    }
+    else {
+      this.logger.info("checking resubscribe")
+>>>>>>> cb3ff484 ([ch4471] Avoid updating subscribed remote videos during connection or when already in the middle of an update)
     }
 
     const metricReport = clientMetricReport.getObservableMetrics();
