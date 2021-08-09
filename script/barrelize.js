@@ -34,6 +34,17 @@ const ignoredTypes = [
   'SignalingProtocol',
   'index',
   'ScreenSignalingProtocol',
+
+  // Events ingestion buffer's JSON interfaces.
+  'JSONIngestionPayloadItem',
+  'JSONIngestionEvent',
+  'JSONIngestionRecord',
+
+  // Events ingestion internal functions.
+  'flattenEventAttributes',
+
+  // Ignore utils
+  'Utils'
 ];
 
 walk('src')
