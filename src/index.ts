@@ -190,6 +190,7 @@ import RealtimeAttendeePositionInFrame from './realtimecontroller/RealtimeAttend
 import RealtimeController from './realtimecontroller/RealtimeController';
 import RealtimeControllerFacade from './realtimecontroller/RealtimeControllerFacade';
 import RealtimeState from './realtimecontroller/RealtimeState';
+import RealtimeSubscribeToAttendeeIdPresenceCallback from './realtimecontroller/RealtimeSubscribeToAttendeeIdPresenceCallback';
 import RealtimeVolumeIndicator from './realtimecontroller/RealtimeVolumeIndicator';
 import ReceiveAudioInputTask from './task/ReceiveAudioInputTask';
 import ReceiveTURNCredentialsTask from './task/ReceiveTURNCredentialsTask';
@@ -492,6 +493,7 @@ export {
   RealtimeController,
   RealtimeControllerFacade,
   RealtimeState,
+  RealtimeSubscribeToAttendeeIdPresenceCallback,
   RealtimeVolumeIndicator,
   ReceiveAudioInputTask,
   ReceiveTURNCredentialsTask,
