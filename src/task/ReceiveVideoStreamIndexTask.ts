@@ -3,7 +3,6 @@
 
 import AudioVideoControllerState from '../audiovideocontroller/AudioVideoControllerState';
 import AudioVideoObserver from '../audiovideoobserver/AudioVideoObserver';
-import Maybe from '../maybe/Maybe';
 import MeetingSessionVideoAvailability from '../meetingsession/MeetingSessionVideoAvailability';
 import DefaultModality from '../modality/DefaultModality';
 import RemovableObserver from '../removableobserver/RemovableObserver';
@@ -15,6 +14,7 @@ import {
   SdkSignalFrame,
   SdkStreamServiceType,
 } from '../signalingprotocol/SignalingProtocol.js';
+import { Maybe } from '../utils/Types';
 import VideoDownlinkBandwidthPolicy from '../videodownlinkbandwidthpolicy/VideoDownlinkBandwidthPolicy';
 import VideoSource from '../videosource/VideoSource';
 import VideoStreamIdSet from '../videostreamidset/VideoStreamIdSet';
@@ -92,6 +92,8 @@ export default class ReceiveVideoStreamIndexTask
     this.resubscribe(videoDownlinkBandwidthPolicy, videoUplinkBandwidthPolicy);
     this.updateVideoAvailability(indexFrame);
     this.handleIndexVideosPausedAtSource();
+    // `forEachObserver`is asynchronous anyways so it doesn't matter (for better or worse) whether we
+    // trigger it before or after the policy update + possible resubscribe kickoff
     const newVideoSources = videoStreamIndex.allVideoSendingSourcesExcludingSelf(selfAttendeeId);
     if (!this.areVideoSourcesEqual(oldVideoSources, newVideoSources)) {
       this.context.audioVideoController.forEachObserver((observer: AudioVideoObserver) => {
@@ -148,7 +150,7 @@ export default class ReceiveVideoStreamIndexTask
         this.context.videoCaptureAndEncodeParameter
       )}`
     );
-    this.context.audioVideoController.update();
+    this.context.audioVideoController.update({ needsRenegotiation: false });
   }
 
   private updateVideoAvailability(indexFrame: SdkIndexFrame): void {

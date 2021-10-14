@@ -53,6 +53,23 @@ The SDK is built to target ES2015, both syntax and features. If you need your bu
 
 Note that due to limitations in transpilers, requirements of the web platform might result in transpiled ES5 code that raises an error when run, such as "Please use the 'new' operator, this DOM object constructor cannot be called as a function". Prefer using ES2015 code on supported platforms.
 
+
+### Is the Amazon Chime SDK supported on mobile browsers?
+
+Amazon Chime SDK for JavaScript is supported on certain mobile browsers listed in the official Amazon Chime SDK documentation: https://docs.aws.amazon.com/chime/latest/dg/meetings-sdk.html#mtg-browsers. Developers can also build native mobile applications using the following SDKs (this option allows for meetings to continue when applications are sent to the background).
+
+Amazon Chime SDK for iOS https://github.com/aws/amazon-chime-sdk-ios
+
+Amazon Chime SDK for Android https://github.com/aws/amazon-chime-sdk-android
+
+
+## Known browser issues
+Please refer to [Known Browser and Compatibility Issues](https://github.com/aws/amazon-chime-sdk-js/issues/1059/) for more information.
+
+### In macOS Safari, audio stops playing when I minimize or move the window to the background. Is this a known issue?
+
+macOS Safari has a [known Web Audio issue](https://bugs.webkit.org/show_bug.cgi?id=231105) that a [MediaStreamAudioDestinationNode](https://developer.mozilla.org/en-US/docs/Web/API/MediaStreamAudioDestinationNode) stops working when you minimize the window. The bug also occurs when you activate the full-screen mode and switch to another window. To remediate the issue, disable Web Audio by passing the `{ enableWebAudio: false }` argument, or no argument, to `new DefaultDeviceController`.
+
 ### I am unable to select an audio output device in some browsers, is this a known issue?
 
 [Firefox](https://bugzilla.mozilla.org/show_bug.cgi?id=1152401) and [Safari](https://bugs.webkit.org/show_bug.cgi?id=179415) have known issues disallowing them from listing audio output devices on these browsers. While clients can continue the meeting using the default device, they will not be able to select devices in meetings. [Chrome and Firefox on iOS](https://bugs.webkit.org/show_bug.cgi?id=179415) also have the same issue.
@@ -79,15 +96,6 @@ If the page itself is loaded via a different network interface than the one that
 
 Customers and end users must ensure that either (a) end users do not use SDK applications in these kinds of split-tunneling scenarios, or (b) the SDK application always requests microphone permissions prior to beginning ICE.
  
-
-### Is the Amazon Chime SDK supported on mobile browsers?
-
-Amazon Chime SDK for JavaScript is supported on certain mobile browsers listed in the official Amazon Chime SDK documentation: https://docs.aws.amazon.com/chime/latest/dg/meetings-sdk.html#mtg-browsers. Developers can also build native mobile applications using the following SDKs (this option allows for meetings to continue when applications are sent to the background).
-
-Amazon Chime SDK for iOS https://github.com/aws/amazon-chime-sdk-ios
-
-Amazon Chime SDK for Android https://github.com/aws/amazon-chime-sdk-android
-
 ## Meetings
 
 ### How do users authenticate into a meeting?
@@ -108,13 +116,13 @@ AWS accounts have a soft limit of [250 concurrent meetings](https://docs.aws.ama
 
 ### How many attendees can join an Amazon Chime SDK meeting? Can this limit be raised?
 
-Amazon Chime SDK limits are defined [here](https://docs.aws.amazon.com/chime/latest/dg/meetings-sdk.html#mtg-limits). The service supports up to 250 attendees and up to 16 video participants in a meeting (video limit is enforced separately). An attendee is considered active unless it has been explicitly removed using DeleteAttendee API call. Attendee limits cannot be changed.
+Amazon Chime SDK limits are defined [here](https://docs.aws.amazon.com/chime/latest/dg/meetings-sdk.html#mtg-limits). The service supports up to 250 attendees and up to 25 video participants in a meeting (video limit is enforced separately). An attendee is considered active unless it has been explicitly removed using DeleteAttendee API call. Attendee limits cannot be changed.
 
 If your use case requires more than 250 attendees, consider using a [broadcasting solution](https://github.com/aws-samples/amazon-chime-meeting-broadcast-demo).
 
-### What happens to the subsequent participants who try to turn on the local video while 16 participants have already turned on the local video?
+### What happens to the subsequent participants who try to turn on the local video while 25 participants have already turned on the local video?
 
-Once the limit of 16 is reached in a meeting, for all the subsequent participants who try to turn on the local video, the SDK sets the Meeting Session status code to [VideoCallSwitchToViewOnly = 10](https://github.com/aws/amazon-chime-sdk-js/blob/bfc4c600fb7e68f2d358ecb6c7fd096d30b2d430/src/meetingsession/MeetingSessionStatusCode.ts#L73) which in turn triggers the observer '[videoSendDidBecomeUnavailable](https://aws.github.io/amazon-chime-sdk-js/interfaces/audiovideoobserver.html#videosenddidbecomeunavailable)'.
+Once the limit of 25 is reached in a meeting, for all the subsequent participants who try to turn on the local video, the SDK sets the Meeting Session status code to [VideoCallSwitchToViewOnly = 10](https://github.com/aws/amazon-chime-sdk-js/blob/bfc4c600fb7e68f2d358ecb6c7fd096d30b2d430/src/meetingsession/MeetingSessionStatusCode.ts#L73) which in turn triggers the observer '[videoSendDidBecomeUnavailable](https://aws.github.io/amazon-chime-sdk-js/interfaces/audiovideoobserver.html#videosenddidbecomeunavailable)'.
 
 ### Can I schedule Amazon Chime SDK meetings ahead of time?
 
@@ -126,17 +134,9 @@ The Amazon Chime SDK does not support scheduling meetings ahead of time. The mom
  
  Suppose an attendee has joined a meeting, now if that same attendee tries to join the same meeting again using the same `AttendeeId` or `ExternalUserId` response received from [CreateAttendee](https://docs.aws.amazon.com/chime/latest/APIReference/API_CreateAttendee.html) API, then, the first attendee will automatically leave the meeting with [`AudioJoinFromAnotherDevice`](https://aws.github.io/amazon-chime-sdk-js/enums/meetingsessionstatuscode.html#audiojoinedfromanotherdevice) meeting session status code. Reference issue: [#1290](https://github.com/aws/amazon-chime-sdk-js/issues/1290). The `AudioJoinFromAnotherDevice` meeting session status code is triggered by Amazon Chime backend and it is not triggered internally from the JS SDK.
 
-### What does it mean when Amazon Chime SDK JS throws error with status code `SignalingBadRequest`, `MeetingEnded` or `SignalingInternalServerError` while establishing a signaling connection to the Chime Servers.
+### What does it mean when the Amazon Chime SDK for JavaScript throws an error with status code `SignalingBadRequest`, `MeetingEnded`, or `SignalingInternalServerError` while establishing a signaling connection to the Chime servers?
 
-From JoinAndReceiveIndexTask.ts, the Chime SDK for JavaScript throws the `SignalingBadRequest` Error. This indicates that the client's request to establish a signaling connection to the Chime Server has failed.
-
-There are 3 cases that can happen here.
-
-1. If the Chime SDK for JavaScript receives a `event.closeCode === 4410` from Amazon Chime backend, that means that an attendee is trying to join a meeting that has already ended. In that case, the Chime SDK for JavaScript throws an error with status code `MeetingEnded`
-2. If the Chime SDK for JavaScript receives `event.closeCode >= 4500 && event.closeCode < 4600`, that indicates an Internal Server Error in the Amazon Chime backend and the Chime SDK for JavaScript throws an error with status code `SignalingInternalServerError`. This indicates there is an issue with the Chime Server that requires further investigation. (e.g a 5xx)
-3. In other cases like when an attendee is deleted (by calling the [DeleteAttendee](https://docs.aws.amazon.com/chime/latest/APIReference/API_DeleteAttendee.html) API), and the client tries to join a meeting with the credentials of the deleted attendee, the Chime SDK for JavaScript throws an error with status code `SignalingBadRequest`.
-
-Here is an example of `SignalingBadRequest` error from an INFO level browser log.
+The `SignalingBadRequest` status code indicates that the Chime SDK for JavaScript has failed to establish a signaling connection to the Chime servers. The INFO-level browser logs may include the following messages:
 
 ```
 sending join
@@ -146,6 +146,71 @@ signaling connection closed by server with code 4403 and reason: attendee unavai
 handling status: SignalingBadRequest
 session will not be reconnected: SignalingBadRequest
 ```
+
+The possible reasons are as follows:
+
+1. If you attempt to join a Chime SDK meeting using the deleted attendee's response, the Chime SDK for JavaScript throws an error with the status code `SignalingBadRequest`. Note that you or someone can delete an attendee in the [DeleteAttendee API](https://docs.aws.amazon.com/chime/latest/APIReference/API_DeleteAttendee.html) action.
+2. The close code `4410` from the Chime backend indicates that an attendee has attempted to join an already-ended meeting. The Chime SDK for JavaScript throws an error with the status code `MeetingEnded`.
+3. The close code between `4500` and `4599` (inclusive) indicates an internal server error in the Amazon Chime backend. In this case, the Chime SDK for JavaScript throws an error with the status code `SignalingInternalServerError`. Please create a GitHub issue including the Chime SDK browser logs.
+
+### When does the Amazon Chime SDK retry the connection? Can I customize this retry behavior?
+
+The Amazon Chime SDK for JavaScript retries the connection in the following situations.
+
+* The SDK misses consecutive pong messages from the Chime server.
+* The SDK detects a high rate of audio packet loss.
+* The SDK experiences a significant audio delay.
+* The SDK encounters a retryable error during the session. Retryable errors are errors with [retryable response status codes](https://aws.github.io/amazon-chime-sdk-js/classes/meetingsessionstatus.html#isfailure) received regarding the session. i.e. status code with `TaskFailed` or `SignalingInternalServerError` will handled for retries.
+
+The SDK uses [ConnectionHealthPolicyConfiguration](https://github.com/aws/amazon-chime-sdk-js/blob/master/src/connectionhealthpolicy/ConnectionHealthPolicyConfiguration.ts) to trigger a reconnection. We recommend using the default configuration, but you can also provide the custom ConnectionHealthPolicyConfiguration object to change this behavior. 
+
+```js
+import {
+  ConnectionHealthPolicyConfiguration,
+  ConsoleLogger,
+  DefaultDeviceController,
+  DefaultMeetingSession,
+  LogLevel,
+  MeetingSessionConfiguration
+} from 'amazon-chime-sdk-js';
+
+const logger = new ConsoleLogger('MyLogger', LogLevel.INFO);
+const deviceController = new DefaultDeviceController(logger);
+
+const healthPolicyConfiguration = new ConnectionHealthPolicyConfiguration();
+
+// Default: 25 consecutive WebRTC stats with no packet. You can reduce this value for a faster retry.
+healthPolicyConfiguration.connectionUnhealthyThreshold = 50;
+
+// Default: 10000 ms
+healthPolicyConfiguration.connectionWaitTimeMs = 20000;
+
+// Default: 60000 ms delay
+healthPolicyConfiguration.maximumAudioDelayMs = 30000; 
+
+// Default: 10 data points
+healthPolicyConfiguration.maximumAudioDelayDataPoints = 5;
+
+// Default: 4 missed pongs. You can set the missed pongs upper threshold to zero to force restart the session.
+healthPolicyConfiguration.missedPongsUpperThreshold = 4; 
+
+const configuration = new MeetingSessionConfiguration(meetingResponse, attendeeResponse);
+
+// Override the default health policy configuration.
+configuration.connectionHealthPolicyConfiguration = healthPolicyConfiguration;
+
+const meetingSession = new DefaultMeetingSession(
+  configuration,
+  logger,
+  deviceController
+);
+```
+
+### What is the timeout for connect and reconnect and where can I configure the value?
+
+The maximum amount of time to allow for connecting is 15 seconds, which can be configurable in [MeetingSessionConfiguration](https://github.com/aws/amazon-chime-sdk-js/blob/0147ed9fb76429a70fb0161405687af63b592fe0/src/meetingsession/MeetingSessionConfiguration.ts#L40). The [reconnectTimeout](https://github.com/aws/amazon-chime-sdk-js/blob/0147ed9fb76429a70fb0161405687af63b592fe0/src/meetingsession/MeetingSessionConfiguration.ts#L67) is configurable for how long you want to timeout the reconnection. The default value is 2 minutes.
+
+
 ## Media
 
 ### Which media regions is the Amazon Chime SDK available in? How do I choose the best media region to place my meetings?
@@ -191,6 +256,7 @@ The [getObservableVideoMetrics](https://aws.github.io/amazon-chime-sdk-js/interf
 // Upstream metrics of local attendee
 videoUpstreamBitrate,
 videoUpstreamPacketsSent,
+videoUpstreamPacketLossPercent,
 videoUpstreamFramesEncodedPerSecond,
 videoUpstreamGoogFrameHeight, (for chromium based browsers)
 videoUpstreamGoogFrameWidth,(for chromium based browsers)
@@ -198,8 +264,9 @@ videoUpstreamFrameHeight,
 videoUpstreamFrameWidth,
 
 // Downstream metrics of remote attendees
-videoDownstreamBitrate
+videoDownstreamBitrate,
 videoDownstreamPacketLossPercent,
+videoDownstreamPacketsReceived,
 videoDownstreamFramesDecodedPerSecond,
 videoDownstreamGoogFrameHeight,
 videoDownstreamGoogFrameWidth,
@@ -293,6 +360,10 @@ For better user experience, we recommend considering [Chime SDK iOS](https://git
 ### **When I join a meeting in Chrome in Android 8 or 9 with speakerphone, other people could not hear me. Switch to default mic fixes the issue.**
 
 This seems to be a [bug](https://bugs.chromium.org/p/webrtc/issues/detail?id=11677) with Android 8 or 9 when using getUserMedia with speakerphone device Id that the audio stream will end after a brief moment. Using default device Id will fix this issue. Note that this only happens if users select speakerphone first. If you use default device when joining the meeting then switch to Speakerphone, this issue does not happen.
+
+### **Why can I not grab device labels in Android Webview?**
+
+This is a [bug](https://bugs.chromium.org/p/chromium/issues/detail?id=669492) with Chromium WebView. There is currently no fix for this issue, but you are able to provide default labels for devices.
 
 ### I see a slate which says "Your client does not support hardware acceleration" when I enable video on my device?
 

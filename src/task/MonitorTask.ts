@@ -13,7 +13,7 @@ import ConnectionHealthData from '../connectionhealthpolicy/ConnectionHealthData
 import ConnectionHealthPolicyConfiguration from '../connectionhealthpolicy/ConnectionHealthPolicyConfiguration';
 import ReconnectionHealthPolicy from '../connectionhealthpolicy/ReconnectionHealthPolicy';
 import UnusableAudioWarningConnectionHealthPolicy from '../connectionhealthpolicy/UnusableAudioWarningConnectionHealthPolicy';
-import Maybe from '../maybe/Maybe';
+import AudioVideoEventAttributes from '../eventcontroller/AudioVideoEventAttributes';
 import MeetingSessionStatus from '../meetingsession/MeetingSessionStatus';
 import MeetingSessionStatusCode from '../meetingsession/MeetingSessionStatusCode';
 import RemovableObserver from '../removableobserver/RemovableObserver';
@@ -23,6 +23,7 @@ import SignalingClientObserver from '../signalingclientobserver/SignalingClientO
 import { ISdkBitrateFrame } from '../signalingprotocol/SignalingProtocol';
 import AudioLogEvent from '../statscollector/AudioLogEvent';
 import VideoLogEvent from '../statscollector/VideoLogEvent';
+import { Maybe } from '../utils/Types';
 import VideoTileState from '../videotile/VideoTileState';
 import BaseTask from './BaseTask';
 
@@ -158,6 +159,7 @@ export default class MonitorTask
     if (!metricReport) {
       return false;
     }
+
     const availableSendBandwidth =
       metricReport.availableSendBandwidth || metricReport.availableOutgoingBitrate;
     const nackCountPerSecond =
@@ -201,7 +203,7 @@ export default class MonitorTask
     }
 
     if (this.checkResubscribe(clientMetricReport)) {
-      this.context.audioVideoController.update();
+      this.context.audioVideoController.update({ needsRenegotiation: false });
     }
 
     if (!this.currentAvailableStreamAvgBitrates) {
@@ -297,7 +299,8 @@ export default class MonitorTask
       this.logger.info(`unusable audio warning is now: ${unusableAudioWarningValue}`);
       if (unusableAudioWarningValue === 0) {
         this.context.poorConnectionCount += 1;
-        this.context.eventController?.pushMeetingState('receivingAudioDropped');
+        const attributes = this.generateAudioVideoEventAttributes();
+        this.context.eventController?.publishEvent('receivingAudioDropped', attributes);
         if (this.context.videoTileController.haveVideoTilesWithStreams()) {
           this.context.audioVideoController.forEachObserver((observer: AudioVideoObserver) => {
             Maybe.of(observer.connectionDidSuggestStopVideo).map(f => f.bind(observer)());
@@ -316,8 +319,6 @@ export default class MonitorTask
   }
 
   private handleBitrateFrame(bitrates: ISdkBitrateFrame): void {
-    const videoSubscription: number[] = this.context.videoSubscriptions || [];
-
     let requiredBandwidthKbps = 0;
     this.currentAvailableStreamAvgBitrates = bitrates;
 
@@ -325,7 +326,7 @@ export default class MonitorTask
       return `simulcast: bitrates from server ${JSON.stringify(bitrates)}`;
     });
     for (const bitrate of bitrates.bitrates) {
-      if (videoSubscription.indexOf(bitrate.sourceStreamId) !== -1) {
+      if (this.context.videosToReceive.contain(bitrate.sourceStreamId)) {
         requiredBandwidthKbps += bitrate.avgBitrateBps;
       }
     }
@@ -356,7 +357,8 @@ export default class MonitorTask
       event.type === SignalingClientEventType.WebSocketFailed
     ) {
       if (!this.hasSignalingError) {
-        this.context.eventController?.pushMeetingState('signalingDropped');
+        const attributes = this.generateAudioVideoEventAttributes();
+        this.context.eventController?.publishEvent('signalingDropped', attributes);
         this.hasSignalingError = true;
       }
     } else if (event.type === SignalingClientEventType.WebSocketOpen) {
@@ -419,5 +421,26 @@ export default class MonitorTask
         });
       }
     }
+  };
+
+  private generateAudioVideoEventAttributes = (): AudioVideoEventAttributes => {
+    const {
+      signalingOpenDurationMs,
+      poorConnectionCount,
+      startTimeMs,
+      iceGatheringDurationMs,
+      attendeePresenceDurationMs,
+      meetingStartDurationMs,
+    } = this.context;
+    const attributes: AudioVideoEventAttributes = {
+      maxVideoTileCount: this.context.maxVideoTileCount,
+      meetingDurationMs: startTimeMs === null ? 0 : Math.round(Date.now() - startTimeMs),
+      signalingOpenDurationMs,
+      iceGatheringDurationMs,
+      attendeePresenceDurationMs,
+      poorConnectionCount,
+      meetingStartDurationMs,
+    };
+    return attributes;
   };
 }

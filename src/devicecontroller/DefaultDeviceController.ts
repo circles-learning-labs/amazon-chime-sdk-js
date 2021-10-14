@@ -7,11 +7,11 @@ import ExtendedBrowserBehavior from '../browserbehavior/ExtendedBrowserBehavior'
 import type { Destroyable } from '../destroyable/Destroyable';
 import DeviceChangeObserver from '../devicechangeobserver/DeviceChangeObserver';
 import Logger from '../logger/Logger';
-import Maybe from '../maybe/Maybe';
 import DefaultMediaDeviceFactory from '../mediadevicefactory/DefaultMediaDeviceFactory';
 import DeviceControllerBasedMediaStreamBroker from '../mediastreambroker/DeviceControllerBasedMediaStreamBroker';
 import AsyncScheduler from '../scheduler/AsyncScheduler';
 import IntervalScheduler from '../scheduler/IntervalScheduler';
+import { Maybe } from '../utils/Types';
 import DefaultVideoTile from '../videotile/DefaultVideoTile';
 import AudioInputDevice from './AudioInputDevice';
 import AudioNodeSubgraph from './AudioNodeSubgraph';
@@ -142,7 +142,7 @@ export default class DefaultDeviceController
   private audioInputDestinationNode: MediaStreamAudioDestinationNode | null = null;
   private audioInputSourceNode: MediaStreamAudioSourceNode | null = null;
 
-  private mediaDeviceWrapper: MediaDevices;
+  private mediaDeviceWrapper: MediaDevices | undefined;
   private onDeviceChangeCallback?: Thunk;
   private muteCallback: (muted: boolean) => void;
 
@@ -152,6 +152,20 @@ export default class DefaultDeviceController
 
   private inputDeviceCount: number = 0;
   private lastNoVideoInputDeviceCount: number;
+
+  // This handles the dispatch of `mute` and `unmute` events from audio tracks.
+  // There's a bit of a semantic mismatch here if input streams allow individual component tracks to be muted,
+  // but addressing that gap is not feasible in our stream-oriented world.
+  private mediaStreamMuteObserver = (id: string | MediaStream, muted: boolean): void => {
+    for (const observer of this.deviceChangeObservers) {
+      AsyncScheduler.nextTick(() => {
+        /* istanbul ignore else */
+        if (this.deviceChangeObservers.has(observer) && observer.audioInputMuteStateChanged) {
+          observer.audioInputMuteStateChanged(id, muted);
+        }
+      });
+    }
+  };
 
   constructor(
     private logger: Logger,
@@ -202,8 +216,11 @@ export default class DefaultDeviceController
       return;
     }
     this.logger.info('Starting devicechange listener.');
-    this.onDeviceChangeCallback = () => this.handleDeviceChange();
-    this.mediaDeviceWrapper.addEventListener('devicechange', this.onDeviceChangeCallback);
+    this.onDeviceChangeCallback = () => {
+      this.logger.info('Device change event callback is triggered');
+      this.handleDeviceChange();
+    };
+    this.mediaDeviceWrapper?.addEventListener('devicechange', this.onDeviceChangeCallback);
   }
 
   /**
@@ -215,7 +232,7 @@ export default class DefaultDeviceController
       return;
     }
     this.logger.info('Stopping devicechange listener.');
-    this.mediaDeviceWrapper.removeEventListener('devicechange', this.onDeviceChangeCallback);
+    this.mediaDeviceWrapper?.removeEventListener('devicechange', this.onDeviceChangeCallback);
     this.onDeviceChangeCallback = undefined;
   }
 
@@ -502,12 +519,11 @@ export default class DefaultDeviceController
 
     // Replace video to send
     if (this.boundAudioVideoController?.videoTileController.hasStartedLocalVideoTile()) {
-      // optimized method exists, a negotiation can be avoided
       if (this.boundAudioVideoController.replaceLocalVideo) {
-        this.restartLocalVideoAfterSelection(null, false, true);
+        this.restartLocalVideoAfterSelection(false, true);
       } else {
-        // non-optimized path, a negotiation is coming
-        await this.boundAudioVideoController.update();
+        // Non-optimal path for backwards compatibility with self implemented controller which will require renegotiation
+        await this.boundAudioVideoController.update({ needsRenegotiation: true });
       }
     }
   }
@@ -619,14 +635,28 @@ export default class DefaultDeviceController
       return;
     }
 
+    const stream = element.srcObject as MediaStream;
     // TODO: implement MediaDestroyer to provide single release MediaStream function
-    this.releaseMediaStream(element.srcObject as MediaStream);
-    DefaultVideoTile.disconnectVideoStreamFromVideoElement(element, false);
-    DefaultVideoTile.connectVideoStreamToVideoElement(
-      this.activeDevices['video'].stream,
-      element,
-      true
-    );
+    // The video stream should be released only if the video stream in the HTML element is different from current stream.
+    // When a filter is applied the existing stream is reused and in that case the stream should not be released.
+    if (stream && this.activeDevices['video'].stream !== stream) {
+      this.releaseMediaStream(element.srcObject as MediaStream);
+      DefaultVideoTile.disconnectVideoStreamFromVideoElement(element, false);
+    }
+
+    if (this.chosenVideoTransformDevice) {
+      DefaultVideoTile.connectVideoStreamToVideoElement(
+        this.chosenVideoTransformDevice.outputMediaStream,
+        element,
+        true
+      );
+    } else {
+      DefaultVideoTile.connectVideoStreamToVideoElement(
+        this.activeDevices['video'].stream,
+        element,
+        true
+      );
+    }
 
     this.trace('startVideoPreviewForVideoInput', element.id);
   }
@@ -740,7 +770,7 @@ export default class DefaultDeviceController
   private releaseAudioTransformStream(): void {
     this.logger.info('Stopping audio track for Web Audio graph');
 
-    this.stopTracksAndRemoveCallback('audio');
+    this.stopTracksAndRemoveCallbacks('audio');
 
     this.logger.info('Removing audio transform, if there is one.');
     this.removeTransform();
@@ -763,14 +793,14 @@ export default class DefaultDeviceController
   private releaseVideoTransformStream(): void {
     this.logger.info('Stopping video track for transform');
 
-    this.stopTracksAndRemoveCallback('video');
+    this.stopTracksAndRemoveCallbacks('video');
 
     this.logger.info('Disconnecting video transform');
     this.chosenVideoTransformDevice.onOutputStreamDisconnect();
     this.chosenVideoTransformDevice = null;
   }
 
-  private stopTracksAndRemoveCallback(kind: 'video' | 'audio'): void {
+  private stopTracksAndRemoveCallbacks(kind: 'video' | 'audio'): void {
     const activeDevice = this.activeDevices[kind];
 
     // Just-in-case error handling.
@@ -781,6 +811,8 @@ export default class DefaultDeviceController
 
     /* istanbul ignore next */
     const endedCallback = activeDevice.endedCallback;
+    const trackMuteCallback = activeDevice.trackMuteCallback;
+    const trackUnmuteCallback = activeDevice.trackUnmuteCallback;
 
     for (const track of activeDevice.stream.getTracks()) {
       track.stop();
@@ -788,9 +820,19 @@ export default class DefaultDeviceController
       /* istanbul ignore else */
       if (endedCallback) {
         track.removeEventListener('ended', endedCallback);
-        delete activeDevice.endedCallback;
+      }
+      /* istanbul ignore else */
+      if (trackMuteCallback) {
+        track.removeEventListener('mute', trackMuteCallback);
+      }
+      /* istanbul ignore else */
+      if (trackUnmuteCallback) {
+        track.removeEventListener('unmute', trackUnmuteCallback);
       }
 
+      delete activeDevice.endedCallback;
+      delete activeDevice.trackMuteCallback;
+      delete activeDevice.trackUnmuteCallback;
       delete this.activeDevices[kind];
     }
   }
@@ -808,24 +850,44 @@ export default class DefaultDeviceController
 
     // This function is called from `CleanStoppedSessionTask` using the
     // session state, which does not allow us to clean up any associated 'ended'
-    // callbacks in advance. Look here to see if we have any to clean up.
+    // or 'mute'/'unmute' callbacks in advance.
+    // Look here to see if we have any to clean up.
     for (const kind in this.activeDevices) {
       const activeDevice = this.activeDevices[kind];
       if (activeDevice?.stream !== mediaStreamToRelease) {
         continue;
       }
-      if (activeDevice.endedCallback) {
-        tracksToStop[0].removeEventListener('ended', activeDevice.endedCallback);
-        delete activeDevice.endedCallback;
-      }
-      delete this.activeDevices[kind];
 
-      if (
-        kind === 'video' &&
-        this.boundAudioVideoController?.videoTileController.hasStartedLocalVideoTile()
-      ) {
-        this.boundAudioVideoController.videoTileController.stopLocalVideoTile();
+      switch (kind) {
+        case 'audio': {
+          for (const track of mediaStreamToRelease.getAudioTracks()) {
+            track.removeEventListener('mute', activeDevice.trackMuteCallback);
+            track.removeEventListener('unmute', activeDevice.trackUnmuteCallback);
+            track.removeEventListener('ended', activeDevice.endedCallback);
+          }
+          delete activeDevice.trackMuteCallback;
+          delete activeDevice.trackUnmuteCallback;
+          delete activeDevice.endedCallback;
+          break;
+        }
+        case 'video': {
+          const endedCallback = activeDevice.endedCallback;
+          if (endedCallback) {
+            for (const track of mediaStreamToRelease.getTracks()) {
+              track.removeEventListener('ended', activeDevice.endedCallback);
+            }
+            delete activeDevice.endedCallback;
+          }
+
+          const tileController = this.boundAudioVideoController?.videoTileController;
+          if (tileController?.hasStartedLocalVideoTile()) {
+            tileController.stopLocalVideoTile();
+          }
+          break;
+        }
       }
+
+      delete this.activeDevices[kind];
     }
   }
 
@@ -1053,9 +1115,7 @@ export default class DefaultDeviceController
       this.deviceInfoCache = [];
       return;
     }
-
     let devices = await navigator.mediaDevices.enumerateDevices();
-
     let hasDeviceLabels = true;
     for (const device of devices) {
       if (!device.label) {
@@ -1075,6 +1135,7 @@ export default class DefaultDeviceController
         this.logger.info('unable to get media device labels');
       }
     }
+    this.logger.debug(`Update device info cache with devices: ${JSON.stringify(devices)}`);
     this.deviceInfoCache = devices;
   }
 
@@ -1242,7 +1303,6 @@ export default class DefaultDeviceController
   }
 
   private async restartLocalVideoAfterSelection(
-    oldDevice: DeviceSelection,
     fromAcquire: boolean,
     fromVideoTransformDevice: boolean
   ): Promise<void> {
@@ -1257,25 +1317,11 @@ export default class DefaultDeviceController
         // calls replaceLocalVideo to avoid a full stop-start update.
         await this.boundAudioVideoController.replaceLocalVideo();
         this.logger.info('successfully replaced video track');
-        if (oldDevice?.stream.active) {
-          this.logger.warn('previous media stream is not stopped during restart video');
-          this.releaseActiveDevice(oldDevice);
-        }
       } else {
         // not from VideoTransformDevice, usual behavior.
         this.logger.info('restarting local video to switch to new device');
-        this.boundAudioVideoController.restartLocalVideo(() => {
-          // TODO: implement MediaStreamDestroyer
-          // tracks of oldStream should be stopped when video tile is disconnected from MediaStream
-          // otherwise, camera is still being accessed and we need to stop it here.
-          if (oldDevice?.stream.active) {
-            this.logger.warn('previous media stream is not stopped during restart video');
-            this.releaseActiveDevice(oldDevice);
-          }
-        });
+        this.boundAudioVideoController.restartLocalVideo(() => {});
       }
-    } else {
-      this.releaseActiveDevice(oldDevice);
     }
   }
 
@@ -1314,9 +1360,11 @@ export default class DefaultDeviceController
   }
 
   private releaseActiveDevice(device: DeviceSelection): void {
+    /* istanbul ignore next */
     if (!device || !device.stream) {
       return;
     }
+
     if (device.endedCallback) {
       const track = device.stream.getTracks()[0];
       // Safety.
@@ -1326,7 +1374,7 @@ export default class DefaultDeviceController
       }
     }
     delete device.endedCallback;
-    this.logger.debug(`Releasing active device ${JSON.stringify(device)}`);
+
     this.releaseMediaStream(device.stream);
     delete device.stream;
   }
@@ -1396,10 +1444,16 @@ export default class DefaultDeviceController
       this.logger.info(`reusing existing ${kind} input device`);
       return;
     }
-
-    if (kind === 'audio' && this.activeDevices[kind] && this.activeDevices[kind].stream) {
-      this.releaseActiveDevice(this.activeDevices[kind]);
+    if (this.activeDevices[kind] && this.activeDevices[kind].stream) {
+      /* istanbul ignore else */
+      if (kind === 'audio') {
+        this.releaseActiveDevice(this.activeDevices[kind]);
+      } else if (kind === 'video') {
+        this.stopTracksAndRemoveCallbacks('video');
+        delete this.activeDevices[kind];
+      }
     }
+
     const startTimeMs = Date.now();
     const newDevice: DeviceSelection = new DeviceSelection();
     try {
@@ -1428,7 +1482,10 @@ export default class DefaultDeviceController
         }
 
         await this.handleDeviceChange();
+
+        // We only monitor the first track, and use its device ID for observer notifications.
         const track = newDevice.stream.getTracks()[0];
+
         newDevice.endedCallback = (): void => {
           // Hard to test, but the safety check is worthwhile.
           /* istanbul ignore else */
@@ -1442,7 +1499,30 @@ export default class DefaultDeviceController
         };
         track.addEventListener('ended', newDevice.endedCallback, { once: true });
       }
-      newDevice.groupId = this.getMediaTrackSettings(newDevice.stream)?.groupId || '';
+
+      if (device !== null) {
+        const newDeviceId = this.getMediaTrackSettings(newDevice.stream)?.deviceId;
+        newDevice.groupId = newDeviceId ? this.getGroupIdFromDeviceId(kind, newDeviceId) : '';
+      } else {
+        newDevice.groupId = '';
+      }
+
+      if (kind === 'audio') {
+        // We only monitor the first track, and use its device ID for observer notifications.
+        const track = newDevice.stream.getAudioTracks()[0];
+        if (track) {
+          const id = track.getSettings().deviceId || newDevice.stream;
+
+          newDevice.trackMuteCallback = (): void => {
+            this.mediaStreamMuteObserver(id, true);
+          };
+          newDevice.trackUnmuteCallback = (): void => {
+            this.mediaStreamMuteObserver(id, false);
+          };
+          track.addEventListener('mute', newDevice.trackMuteCallback, { once: false });
+          track.addEventListener('unmute', newDevice.trackUnmuteCallback, { once: false });
+        }
+      }
     } catch (error) {
       let errorMessage: string;
       if (error?.name && error.message) {
@@ -1502,6 +1582,18 @@ export default class DefaultDeviceController
 
     this.logger.info(`got ${kind} device for constraints ${JSON.stringify(proposedConstraints)}`);
     await this.handleNewInputDevice(kind, newDevice, fromAcquire, fromVideoTransformDevice);
+
+    // Notify the device mute state immediately after selection.
+    if (kind === 'audio') {
+      this.logger.debug('Notifying mute state after selection');
+      for (const track of newDevice.stream.getAudioTracks()) {
+        if (track.muted) {
+          newDevice.trackMuteCallback();
+        } else {
+          newDevice.trackUnmuteCallback();
+        }
+      }
+    }
     return;
   }
 
@@ -1511,8 +1603,6 @@ export default class DefaultDeviceController
     fromAcquire: boolean,
     fromVideoTransformDevice: boolean = false
   ): Promise<void> {
-    const oldDevice = this.activeDevices[kind];
-
     this.activeDevices[kind] = newDevice;
     this.logger.debug(`Set activeDevice to ${JSON.stringify(newDevice)}`);
     this.watchForDeviceChangesIfNecessary();
@@ -1524,10 +1614,8 @@ export default class DefaultDeviceController
         this.logger.info('apply processors to transform');
         await this.chosenVideoTransformDevice.transformStream(this.activeDevices['video'].stream);
       }
-      await this.restartLocalVideoAfterSelection(oldDevice, fromAcquire, fromVideoTransformDevice);
+      await this.restartLocalVideoAfterSelection(fromAcquire, fromVideoTransformDevice);
     } else {
-      this.releaseActiveDevice(oldDevice);
-
       if (this.useWebAudio) {
         this.attachAudioInputStreamToAudioContext(this.activeDevices[kind].stream);
       } else if (this.boundAudioVideoController) {

@@ -34,22 +34,22 @@ If you think your application might be used in these scenarios, take care to tes
 
 ### Browser compatibility
 
-Amazon Voice Focus in the Amazon Chime SDK for JavaScript works in Firefox, Chrome, and Chromium-based browsers (including Electron) on desktop and Android operating systems. A full compatibility table is below.
-
-Amazon Voice Focus does not support the release version of Safari on desktop or iOS devices, because Safari does not implement the required web standards. Amazon Voice Focus supports Safari Technology Preview (v14.1, 117) as of version 2.4 of the Amazon Chime SDK.
+Amazon Voice Focus in the Amazon Chime SDK for JavaScript works in Firefox, Chrome, and Chromium-based browsers (including Electron) on desktop, Android, and iOS operating systems, and Safari 14.1 and later on macOS and some iOS devices. A full compatibility table is below.
 
 |Browser                                                                |Minimum supported version  |Preferred version  |Notes               |
 |---                                                                    |---                        |---                |---                 |
 |Firefox                                                                |76                         |83+                |                    |
 |Chromium-based browsers and environments, including Edge and Electron  |78                         |87+                |                    |
-|Safari                                                                 |14.1*                      |-                  |Technology Preview  |
+|Safari                                                                 |14.1                       |-                  |                    |
 |Android browser                                                        |78*                        |87*                |Typically too slow. |
-|iOS Safari                                                             |Not supported              |-                  |                    |
-|iOS Chrome                                                             |Not supported              |-                  |                    |
-|iOS Firefox                                                            |Not supported              |-                  |                    |
+|iOS Safari                                                             |iOS 14                     |-                  |                    |
+|iOS Chrome                                                             |iOS 14                     |-                  |                    |
+|iOS Firefox                                                            |iOS 14                     |-                  |                    |
 
 
-Amazon Voice Focus is more CPU-intensive than conventional noise suppression systems, and the web runtime affects performance. As such, not all mobile devices or lower-spec laptop or desktop computers will be sufficiently powerful. The default configuration will adapt to available processor power and adjust quality accordingly, but some browsers and devices will simply be unable to enable the feature. Android browsers are theoretically compatible, but typically cannot meet the performance requirements.
+Amazon Voice Focus is more CPU-intensive than conventional noise suppression systems, and the web runtime affects performance. As such, not all mobile devices or lower-spec laptop or desktop computers will be sufficiently powerful, or will be able to use Amazon Voice Focus while also supporting multiple video streams and rich application functionality.
+
+The default configuration will adapt to available processor power and adjust quality accordingly, but some browsers and devices will simply be unable to enable the feature. Android browsers are theoretically compatible, but typically cannot meet the performance requirements. iOS 14 ships Safari 14, and relatively modern iPhones (*e.g.*, iPhone X) have been found to be fast enough.
 
 See the sections “[Checking for support before offering noise suppression](#checking-for-support-before-offering-noise-suppression)” and “[Adapting to performance constraints](#adapting-to-performance-constraints)” for more details about checking for support and adapting to capabilities.
 
@@ -110,6 +110,22 @@ Cross-Origin-Embedder-Policy: require-corp
 ```
 
 when serving your application HTML. These headers are optional but advised: they improve web security, as well as allowing the browser to support technologies like `SharedArrayBuffer`.
+
+## Frames
+
+Before attempting to use Amazon Voice Focus, make sure that your application is not running in an iframe. Browsers, particularly Chromium-based browsers like Chrome, Electron, and Edge, can restrict use of real-time scheduling in iframes (called "subframes" in Chromium). This results in choppy and unintelligible audio.
+
+You can check whether your page or application is running in a subframe by using Chromium's `about:tracing` page.
+
+1. Load your application as normal.
+2. Press **Record** in the tracing page.
+3. Choose "Manually select settings", click **None** on both sides, check `audio-worklet` and `webaudio.audionode` on the right side and `webaudio` on the left, then press **Record**.
+4. In your application, start audio and activate Amazon Voice Focus.
+5. Return to the tracing page and press **Stop**.
+6. Expand the "Renderer" row for your page in the main part of the window. Make sure you see "Realtime AudioWorklet thread".
+7. Click **Processes** in the top right. Make sure the one that shows your page title _does not_ say "Subframe".
+
+The Amazon Voice Focus support check in `VoiceFocusDeviceTransformer.isSupported` will warn to its provided logger if run in an iframe, and will report no support if `{ allowIFrame: false }` is provided as part of its options argument.
 
 ## Checking for support before offering noise suppression
 

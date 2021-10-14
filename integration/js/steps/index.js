@@ -2,6 +2,7 @@ exports.JoinMeetingStep = require('./JoinMeetingStep');
 exports.OpenAppStep = require('./OpenAppStep');
 exports.CloseAppStep = require('./CloseAppStep');
 exports.ClickVideoButton = require('./ClickVideoButton');
+exports.ClickMediaCaptureButton = require('./ClickMediaCaptureButton');
 exports.ClickUnbindVideoElementButton = require('./ClickUnbindVideoElementButton');
 exports.ClickBindVideoElementButton = require('./ClickBindVideoElementButton');
 exports.ClickPinVideoTileButton = require('./ClickPinVideoTileButton');
@@ -51,3 +52,8 @@ exports.SetTestBrokenStep = require('./SetTestBrokenStep');
 exports.OpenMessagingSessionAppStep = require('./OpenMessagingSessionAppStep');
 exports.ConnectMessagingSessionStep = require('./ConnectMessagingSessionStep');
 exports.DisconnectMessagingSessionStep = require('./DisconnectMessagingSessionStep');
+
+exports.StartMeetingTranscriptionStep = require('./StartMeetingTranscriptionStep');
+exports.StopMeetingTranscriptionStep = require('./StopMeetingTranscriptionStep');
+exports.PlayPrerecordedSpeechStep = require('./PlayPrerecordedSpeechStep');
+exports.SelectNoneAudioInputStep = require('./SelectNoneAudioInputStep');

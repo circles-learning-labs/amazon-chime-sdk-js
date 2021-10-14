@@ -2,15 +2,41 @@ const {KiteTestError, Status} = require('kite-common');
 const AppTestStep = require('../utils/AppTestStep');
 
 class AuthenticateUserStep extends AppTestStep {
-  constructor(kiteBaseTest, sessionInfo, attendee_id, useSimulcastFlag = false, useWebAudioFlag = false) {
+  constructor(
+    kiteBaseTest,
+    sessionInfo,
+    attendee_id,
+    useSimulcastFlag = false,
+    useWebAudioFlag = false,
+    enableEventReporting = false,
+    region = ''
+  ) {
     super(kiteBaseTest, sessionInfo);
     this.attendee_id = attendee_id;
     this.useSimulcastFlag = useSimulcastFlag;
     this.useWebAudioFlag = useWebAudioFlag;
+    this.enableEventReporting = enableEventReporting;
+    this.region = region;
   }
 
-  static async executeStep(KiteBaseTest, sessionInfo, attendee_id, useSimulcastFlag = false, useWebAudioFlag = false) {
-    const step = new AuthenticateUserStep(KiteBaseTest, sessionInfo, attendee_id, useSimulcastFlag, useWebAudioFlag);
+  static async executeStep(
+    KiteBaseTest,
+    sessionInfo,
+    attendee_id,
+    useSimulcastFlag = false,
+    useWebAudioFlag = false,
+    enableEventReporting = false,
+    region = '',
+  ) {
+    const step = new AuthenticateUserStep(
+      KiteBaseTest,
+      sessionInfo,
+      attendee_id,
+      useSimulcastFlag,
+      useWebAudioFlag,
+      enableEventReporting,
+      region
+    );
     await step.execute(KiteBaseTest);
   }
 
@@ -32,6 +58,14 @@ class AuthenticateUserStep extends AppTestStep {
     if (this.useWebAudioFlag) {
       this.logger("choose to use Web Audio");
       await this.page.chooseUseWebAudio();
+    }
+    if (this.enableEventReporting) {
+      this.logger("Event reporting enabled");
+      await this.page.chooseEnableEventReporting();
+    }
+    if (this.region !== '') {
+      this.logger(`selecting region ${this.region}`);
+      await this.page.selectRegion(this.region);
     }
     await this.page.authenticate();
     this.logger("waiting to authenticate");

@@ -13,11 +13,50 @@ export default class DefaultTransceiverController implements TransceiverControll
   protected videoSubscriptions: number[] = [];
   protected defaultMediaStream: MediaStream | null = null;
   protected peer: RTCPeerConnection | null = null;
+  protected streamIdToTransceiver: Map<number, RTCRtpTransceiver> = new Map();
 
   constructor(protected logger: Logger, protected browserBehavior: BrowserBehavior) {}
 
-  setEncodingParameters(_params: Map<string, RTCRtpEncodingParameters>): void {
-    return;
+  async setEncodingParameters(
+    encodingParamMap: Map<string, RTCRtpEncodingParameters>
+  ): Promise<void> {
+    if (!this._localCameraTransceiver || this._localCameraTransceiver.direction !== 'sendrecv') {
+      return;
+    }
+
+    const sender = this._localCameraTransceiver.sender;
+    if (!encodingParamMap || encodingParamMap.size === 0) {
+      return;
+    }
+    const newEncodingParams = Array.from(encodingParamMap.values());
+
+    const oldParam: RTCRtpSendParameters = sender.getParameters();
+    if (!oldParam.encodings || oldParam.encodings.length === 0) {
+      oldParam.encodings = newEncodingParams;
+    } else {
+      for (const existing of oldParam.encodings) {
+        for (const changed of newEncodingParams) {
+          if ((existing.rid || changed.rid) && existing.rid !== changed.rid) {
+            continue;
+          }
+          let key: keyof RTCRtpEncodingParameters;
+          for (key in changed) {
+            // These properties can't be changed.
+            if (key === 'rid' || key === 'codecPayloadType') {
+              continue;
+            }
+            /* istanbul ignore else */
+            if (changed.hasOwnProperty(key)) {
+              (existing[key] as RTCRtpEncodingParameters[keyof RTCRtpEncodingParameters]) = changed[
+                key
+              ];
+            }
+          }
+        }
+      }
+    }
+
+    await sender.setParameters(oldParam);
   }
 
   static async setVideoSendingBitrateKbpsForSender(
@@ -59,7 +98,6 @@ export default class DefaultTransceiverController implements TransceiverControll
   }
 
   async setVideoSendingBitrateKbps(bitrateKbps: number): Promise<void> {
-    // this won't set bandwidth limitation for video in Chrome
     if (!this._localCameraTransceiver || this._localCameraTransceiver.direction !== 'sendrecv') {
       return;
     }
@@ -199,6 +237,9 @@ export default class DefaultTransceiverController implements TransceiverControll
             if (videoStreamIndex.StreamIdsInSameGroup(streamId, recvStreamId)) {
               transceiver.direction = 'recvonly';
               this.videoSubscriptions[n] = recvStreamId;
+
+              this.streamIdToTransceiver.delete(streamId);
+              this.streamIdToTransceiver.set(recvStreamId, transceiver);
               videosRemaining.splice(index, 1);
               break;
             }
@@ -220,10 +261,16 @@ export default class DefaultTransceiverController implements TransceiverControll
         transceiver.direction = 'recvonly';
         const streamId = videosRemaining.shift();
         this.videoSubscriptions[n] = streamId;
+        this.streamIdToTransceiver.set(streamId, transceiver);
       } else {
         // Remove if no longer subscribed
         if (this.videoSubscriptions[n] === 0) {
           transceiver.direction = 'inactive';
+          for (const [streamId, previousTransceiver] of this.streamIdToTransceiver.entries()) {
+            if (transceiver === previousTransceiver) {
+              this.streamIdToTransceiver.delete(streamId);
+            }
+          }
         }
       }
       n += 1;
@@ -236,6 +283,7 @@ export default class DefaultTransceiverController implements TransceiverControll
         direction: 'recvonly',
         streams: [this.defaultMediaStream],
       });
+      this.streamIdToTransceiver.set(index, transceiver);
       this.videoSubscriptions.push(index);
       this.logger.info(
         `adding transceiver mid: ${transceiver.mid} subscription: ${index} direction: recvonly`
@@ -243,7 +291,21 @@ export default class DefaultTransceiverController implements TransceiverControll
     }
   }
 
-  private transceiverIsVideo(transceiver: RTCRtpTransceiver): boolean {
+  getMidForStreamId(streamId: number): string | undefined {
+    return this.streamIdToTransceiver.get(streamId)?.mid;
+  }
+
+  setStreamIdForMid(mid: string, newStreamId: number): void {
+    for (const [streamId, transceiver] of this.streamIdToTransceiver.entries()) {
+      if (transceiver.mid === mid) {
+        this.streamIdToTransceiver.delete(streamId);
+        this.streamIdToTransceiver.set(newStreamId, transceiver);
+        return;
+      }
+    }
+  }
+
+  protected transceiverIsVideo(transceiver: RTCRtpTransceiver): boolean {
     return (
       (transceiver.receiver &&
         transceiver.receiver.track &&

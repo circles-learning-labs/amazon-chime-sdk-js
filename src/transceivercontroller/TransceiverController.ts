@@ -63,6 +63,17 @@ export default interface TransceiverController {
   ): number[];
 
   /**
+   * Get the associated MID for a given stream ID, either set via `updateVideoTranceivers`
+   * or overriden through `setStreamIdForMid`.
+   */
+  getMidForStreamId?(streamId: number): string | undefined;
+
+  /**
+   * Override or set an internal mapping of stream ID to MID.
+   */
+  setStreamIdForMid?(mid: string, streamId: number): void;
+
+  /**
    * Sets video sending bitrate in Kilo-bit-per-second
    */
   setVideoSendingBitrateKbps(bitrateKbps: number): void;
@@ -78,7 +89,17 @@ export default interface TransceiverController {
   localVideoTransceiver(): RTCRtpTransceiver;
 
   /**
-   * Set [[RTCRtpEncodingParameters]] on the sender of transceiver
+   * Set [[RTCRtpEncodingParameters]] on the sender of transceiver.
+   * This method should be called whenever the sender's encoding parameters of the local video transceiver need to
+   * be updated.
+   * For example, the default NScaleVideoUplinkBandwidthPolicy calls this method whenever a video is on/off or the
+   * active speaker changes.
+   * This method assumes that the sender of the local video transceiver is available and the input parameters should
+   * not be empty.
+   * The encoding parameters for sender should be retrieved using sender.getParameters and updated using
+   * sender.setParameters method.
+   * @param {Map<string, RTCRtpEncodingParameters>} params - The encoding parameters. If you have multiple encoding
+   * parameters for different video layers, the key should be the rid corresponding to the RTCRtpEncodingParameters.
    */
   setEncodingParameters(params: Map<string, RTCRtpEncodingParameters>): void;
 }

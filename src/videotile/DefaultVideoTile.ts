@@ -98,8 +98,11 @@ export default class DefaultVideoTile implements DevicePixelRatioObserver, Video
       // Need to yield the message loop before clearing `srcObject` to
       // prevent Safari from crashing.
       if (new DefaultBrowserBehavior().requiresVideoElementWorkaround()) {
+        const prevSrcObject = videoElement.srcObject;
         AsyncScheduler.nextTick(() => {
-          videoElement.srcObject = null;
+          if (videoElement.srcObject === prevSrcObject) {
+            videoElement.srcObject = null;
+          }
         });
       } else {
         videoElement.srcObject = null;
@@ -262,6 +265,13 @@ export default class DefaultVideoTile implements DevicePixelRatioObserver, Video
     const ctx = canvas.getContext('2d');
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     return ctx.getImageData(0, 0, canvas.width, canvas.height);
+  }
+
+  setStreamId(id: number): void {
+    this.tileState.streamId = id;
+    // `streamId` is not likely used by builders but we can't
+    // be sure so send a tile state update just in case.
+    this.tileController.sendTileStateUpdate(this.state());
   }
 
   private sendTileStateUpdate(): void {
