@@ -17,6 +17,44 @@
   </div>
 </div>
 
+<template id="video-tile-template">
+  <video class="video-tile-video"></video>
+  <div class="video-tile-attendee-id"></div>
+  <div class="video-tile-nameplate"></div>
+  <div class="video-tile-pause-state"></div>
+  <div class="button-video-tile-config" role="group">
+    <button type="button" class="btn btn-success dropdown-toggle button-video-tile-config-drop" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" title="Video Tile Settings"><%= require('../../node_modules/open-iconic/svg/cog.svg') %></button>
+    <div class="dropdown-menu dropdown-menu-right dropdown-video-tile-config" aria-labelledby="button-video-tile-config-drop" style="position: absolute; transform: translate3d(0px, 38px, 0px); top: 0px; left: 0px; will-change: transform;">
+      <a class="dropdown-item video-tile-pause">Pause</a>
+      <div class="dropdown-divider"></div>
+      <h6 class="dropdown-header target-resolution-header">Target Resolution</h6>
+      <form class="btn-group btn-group-toggle video-tile-config-toggle target-resolution-toggle" data-toggle="buttons">
+        <label class="btn btn-secondary">
+          <input type="radio" name="level" value="low" autocomplete="off">Low
+        </label>
+        <label class="btn btn-secondary">
+          <input type="radio" name="level" value="medium" autocomplete="off">Medium
+        </label>
+        <label class="btn btn-secondary active">
+          <input type="radio" name="level" value="high" autocomplete="off" checked>High
+        </label>
+      </form>
+      <h6 class="dropdown-header video-priority-header">Video Priority</h6>
+      <form class="btn-group btn-group-toggle video-tile-config-toggle video-priority-toggle" data-toggle="buttons">
+        <label class="btn btn-secondary">
+          <input type="radio" name="level" value="low" autocomplete="off">Low
+        </label>
+        <label class="btn btn-secondary active">
+          <input type="radio" name="level" value="medium" autocomplete="off" checked>Medium
+        </label>
+        <label class="btn btn-secondary">
+            <input type="radio" name="level" value="high" autocomplete="off">High
+        </label>
+      </form>
+    </div>
+  </div>
+</template>
+
 <!-- Initial meeting authentication screen with meeting and name inputs -->
 <div id="flow-authenticate" class="flow text-center p-2">
   <div class="text-muted" style="position:fixed;right:3px;bottom:3px" id="sdk-version"></div>
@@ -58,6 +96,16 @@
         <div class="col-12">
           <fieldset>
             <legend>Choose your optional features</legend>
+            <div class="custom-control" style="text-align: left;">
+              <label for="logLevel">Choose a Log Level:</label>
+              <select name="logLevel" id="logLevelSelect">
+                <option value="INFO">INFO</option>
+                <option value="DEBUG">DEBUG</option>
+                <option value="WARN">WARN</option>
+                <option value="ERROR">ERROR</option>
+                <option value="OFF">OFF</option>
+              </select>
+            </div>
             <div class="custom-control custom-checkbox" style="text-align: left;">
               <input type="checkbox" id="webaudio" class="custom-control-input">
               <label for="webaudio" class="custom-control-label">Use WebAudio</label>
@@ -81,10 +129,19 @@
             <div class="custom-control custom-checkbox" style="text-align: left;">
               <input type="checkbox" id="priority-downlink-policy" class="custom-control-input">
               <label for="priority-downlink-policy" class="custom-control-label">Use Priority-Based Downlink Policy</label>
+              <select id="priority-downlink-policy-preset" class="custom-select" style="width:100%; display: none;">
+                <option value="default" selected>Default</option>
+                <option value="stable">Stable Network</option>
+                <option value="unstable">Unstable Network</option>
+              </select>
             </div>
             <div class="custom-control custom-checkbox" style="text-align: left;">
               <input type="checkbox" checked id="preconnect" class="custom-control-input">
               <label for="preconnect" class="custom-control-label">Open signaling connection early</label>
+            </div>
+            <div class="custom-control custom-checkbox" style="text-align: left;">
+              <input type="checkbox" id="event-reporting" class="custom-control-input">
+              <label for="event-reporting" class="custom-control-label">Enable event reporting</label>
             </div>
             <div class="custom-control custom-checkbox" style="text-align: left;">
               <input type="checkbox" id="die" class="custom-control-input">
@@ -190,12 +247,17 @@
     <form id="form-devices">
       <h1 class="h3 mb-3 font-weight-normal text-center">Select devices</h1>
       <div class="row mt-3">
-        <div class="col-12 col-sm-8">
+        <div class="col-12 text-center d-sm-block video-preview">
+          <video id="video-preview" class="" style="border-radius:8px"></video>
+        </div>
+      </div>
+      <div class="row mt-3">
+        <div class="col-12">
           <label for="audio-input block">Microphone</label>
           <select id="audio-input" class="custom-select" style="width:100%"></select>
         </div>
 
-        <div class="text-center col-sm-4 d-sm-block">
+        <div class="text-center col-12 d-sm-block">
           <label>Preview</label>
           <div class="w-100 progress" style="margin-top:0.75rem">
             <div id="audio-preview" class="progress-bar bg-success" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
@@ -203,22 +265,21 @@
         </div>
       </div>
       <div class="row mt-3">
-        <div id="voice-focus-setting" class="col-12 col-sm-8 hidden">
+        <div id="voice-focus-setting" class="col-12 hidden">
           <input autocomplete="off" type="checkbox" id="add-voice-focus"></input>
           <label style="margin-left: 0.5em" for="voice-focus-setting block">Add Voice Focus</label>
         </div>
       </div>
       <div class="row mt-3">
-        <div class="col-12 col-sm-8">
+        <div class="col-12">
           <label for="video-input block">Camera</label>
           <select id="video-input" class="custom-select" style="width:100%"></select>
         </div>
-        <div class="col-sm-4 text-center d-sm-block video-preview">
-          <video id="video-preview" class="w-100 h-100" style="max-width:137px;max-height:82px;border-radius:8px"></video>
-        </div>
+        
       </div>
       <div class="row mt-3">
-        <div class="col-12 col-sm-8">
+        <div class="col-12">
+          <label for="video-input-quality block">Resolution</label>
           <select id="video-input-quality" class="custom-select" style="width:100%">
             <option value="360p">360p (nHD) @ 15 fps (600 Kbps max)</option>
             <option value="540p" selected>540p (qHD) @ 15 fps (1.4 Mbps max)</option>
@@ -226,13 +287,21 @@
           </select>
         </div>
       </div>
+      <div class="row mt-3" id="video-input-filter-container">
+        <div class="col-12">
+          <label for="video-input-filter block">Video Filter</label>
+          <select id="video-input-filter" class="custom-select" style="width:100%">
+            <option value="None" selected>None</option>
+          </select>
+        </div>
+      </div>
       <div class="row mt-3">
-        <div class="col-12 col-sm-8">
+        <div class="col-12">
           <label for="audio-output block">Speaker</label>
           <select id="audio-output" class="custom-select" style="width:100%"></select>
         </div>
-        <div class="col-sm-4">
-          <button id="button-test-sound" class="btn btn-outline-secondary btn-block h-50 d-sm-block" style="margin-top:2rem">Test</button>
+        <div class="col-12">
+          <button id="button-test-sound" class="btn btn-outline-secondary btn-block h-50 d-sm-block" style="margin-top:2rem">Test Speaker</button>
         </div>
       </div>
 
@@ -256,6 +325,82 @@
 <!-- In-meeting screen -->
 
 <div id="flow-meeting" class="flow" style="position:absolute;left:0;top:0;bottom:55px;right:0">
+  <div id="live-transcription-modal" class="modal">
+    <div id="live-transcription-modal-content" class="modal-content">
+      <div class="modal-content-header">
+        <span></span>
+        <span class="modal-title text-muted">Live Transcription Configuration</span>
+        <span id="button-live-transcription-modal-close" class="close">&times;</span>
+      </div>
+      <div id="engine-option-group active">
+        <input type="radio" id="engine-transcribe" name="transcription-engine" value="engine-transcribe" checked=true>
+        <label for="engine-transcribe">Amazon Transcribe</label><br>
+        <input type="radio" id="engine-transcribe-medical" name="transcription-engine" value="engine-transcribe-medical">
+        <label for="engine-transcribe-medical">Amazon Transcribe Medical</label><br>
+      </div>
+      <div id="engine-language-group">
+        <div id="engine-transcribe-language">
+          <label for="transcribe-language" class="sr-only">Language</label>
+          <select id="transcribe-language" class="custom-select"  style="width:100%">
+            <option value="en-US" selected>US English (en-US)</option>
+            <option value="en-GB">British English (en-GB)</option>
+            <option value="en-AU">Australian English (en-AU)</option>
+            <option value="es-US">US Spanish (es-US)</option>
+            <option value="fr-CA">Canadian French (fr-CA)</option>
+            <option value="fr-FR">French (fr-FR)</option>
+            <option value="it-IT">Italian (it-IT)</option>
+            <option value="de-DE">German (de-DE)</option>
+            <option value="pt-BR">Brazilian Portuguese (pt-BR)</option>
+            <option value="ja-JP">Japanese (ja-JP)</option>
+            <option value="ko-KR">Korean (ko-KR)</option>
+            <option value="zh-CN">Mandarin Chinese - Mainland (zh-CN)</option>
+          </select>
+        </div>
+        <div id="engine-transcribe-medical-language" class="hidden">
+          <label for="transcribe-medical-language" class="sr-only">Language</label>
+          <select id="transcribe-medical-language" class="custom-select"  style="width:100%">
+            <option value="en-US" selected>US English (en-US)</option>
+          </select>
+        </div>
+      </div>
+      <div id="transcription-region-group">
+        <div id="engine-transcribe-region">
+          <label for="transcribe-region" class="sr-only">Region</label>
+          <select id="transcribe-region" class="custom-select"  style="width:100%">
+            <option value="auto" selected>Auto</option>
+            <option value="">Not specified</option>
+            <option value="ap-northeast-1">Japan (Tokyo)</option>
+            <option value="ap-northeast-2">South Korea (Seoul)</option>
+            <option value="ap-southeast-2">Australia (Sydney)</option>
+            <option value="ca-central-1">Canada</option>
+            <option value="eu-central-1">Germany (Frankfurt)</option>
+            <option value="eu-west-1">Ireland</option>
+            <option value="eu-west-2">United Kingdom (London)</option>
+            <option value="sa-east-1">Brazil (São Paulo)</option>
+            <option value="us-east-1">United States (N. Virginia)</option>
+            <option value="us-east-2">United States (Ohio)</option>
+            <option value="us-west-2">United States (Oregon)</option>
+          </select>
+        </div>
+        <div id="engine-transcribe-medical-region" class="hidden">
+          <label for="transcribe-medical-region" class="sr-only">Language</label>
+          <select id="transcribe-medical-region" class="custom-select"  style="width:100%">
+            <option value="auto" selected>Auto</option>
+            <option value="">Not specified</option>
+            <option value="ap-southeast-2">Australia (Sydney)</option>
+            <option value="ca-central-1">Canada</option>
+            <option value="eu-west-1">Ireland</option>
+            <option value="us-east-1">United States (N. Virginia)</option>
+            <option value="us-east-2">United States (Ohio)</option>
+            <option value="us-west-2">United States (Oregon)</option>
+          </select>
+        </div>
+      </div>
+      <button id="button-start-transcription" type="button" class="btn btn-success mx-1 mx-xl-2 my-2" title="Start" data-toggle="button" aria-pressed="false" autocomplete="off">
+        <%= require('../../node_modules/open-iconic/svg/caret-right.svg') %>
+      </button>
+    </div>
+  </div>
   <div class="p-2 d-none d-sm-block align-items-end" style="position:fixed;right:0;bottom:0;left:0;">
     <div class="row align-items-end">
       <div class="col">
@@ -279,7 +424,7 @@
       <div class="col-8 col-lg-6 order-2 order-lg-2 text-left text-lg-center">
         <div class="btn-group mx-1 mx-xl-2 my-2" role="group" aria-label="Toggle microphone">
           <button id="button-microphone" type="button" class="btn btn-success" title="Toggle microphone">
-            ${require('../../node_modules/open-iconic/svg/microphone.svg').default}
+            <%= require('../../node_modules/open-iconic/svg/microphone.svg') %>
           </button>
           <div class="btn-group" role="group">
             <button id="button-microphone-drop" type="button" class="btn btn-success dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" title="Select microphone"></button>
@@ -290,7 +435,7 @@
         </div>
         <div class="btn-group mx-1 mx-xl-2 my-2" role="group" aria-label="Toggle camera">
           <button id="button-camera" type="button" class="btn btn-success" title="Toggle camera">
-            ${require('../../node_modules/open-iconic/svg/video.svg').default}
+            <%= require('../../node_modules/open-iconic/svg/video.svg') %>
           </button>
           <div class="btn-group" role="group">
             <button id="button-camera-drop" type="button" class="btn btn-success dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" title="Select camera"></button>
@@ -301,7 +446,7 @@
         </div>
         <div class="btn-group mx-1 mx-xl-2 my-2" role="group" aria-label="Apply filter">
           <button id="button-video-filter" type="button" class="btn btn-success" title="Apply filter">
-            ${require('../../node_modules/open-iconic/svg/contrast.svg').default}
+            <%= require('../../node_modules/open-iconic/svg/contrast.svg') %>
           </button>
           <div class="btn-group" role="group">
             <button id="button-video-filter-drop" type="button" class="btn btn-success dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" title="Select filter"></button>
@@ -312,7 +457,7 @@
         </div>
         <div class="btn-group mx-1 mx-xl-2 my-2" role="group" aria-label="Toggle content share">
           <button id="button-content-share" type="button" class="btn btn-success" title="Toggle content share">
-            ${require('../../node_modules/open-iconic/svg/camera-slr.svg').default}
+            <%= require('../../node_modules/open-iconic/svg/camera-slr.svg') %>
           </button>
           <div class="btn-group" role="group">
             <button id="button-content-share-drop" type="button" class="btn btn-success dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" title="Select content to share"></button>
@@ -325,11 +470,11 @@
           </div>
         </div>
         <button id="button-pause-content-share" type="button" class="btn btn-success mx-1 mx-xl-2 my-2" title="Pause and unpause content share">
-          ${require('../../node_modules/open-iconic/svg/media-pause.svg').default}
+          <%= require('../../node_modules/open-iconic/svg/media-pause.svg') %>
         </button>
         <div class="btn-group mx-1 mx-xl-2 my-2" role="group" aria-label="Toggle speaker">
           <button id="button-speaker" type="button" class="btn btn-success" title="Toggle speaker">
-            ${require('../../node_modules/open-iconic/svg/volume-low.svg').default}
+            <%= require('../../node_modules/open-iconic/svg/volume-low.svg') %>
           </button>
           <div class="btn-group" role="group">
             <button id="button-speaker-drop" type="button" class="btn btn-success dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" title="Select speaker"></button>
@@ -338,19 +483,25 @@
             </div>
           </div>
         </div>
+        <button id="button-live-transcription" type="button" class="btn btn-success mx-1 mx-xl-2 my-2" title="Toggle live transcription display" data-toggle="button" aria-pressed="false" autocomplete="off" style="display: none">
+          <%= require('../../node_modules/open-iconic/svg/code.svg') %>
+        </button>
         <button id="button-video-stats" type="button" class="btn btn-success mx-1 mx-xl-2 my-2" title="Toggle video WebRTC stats display" data-toggle="button" aria-pressed="false" autocomplete="off">
-          ${require('../../node_modules/open-iconic/svg/signal.svg').default}
+          <%= require('../../node_modules/open-iconic/svg/signal.svg') %>
         </button>
         <button id="button-record-self" type="button" class="btn btn-success mx-1 mx-xl-2 my-2" title="Record my audio and video" data-toggle="button" aria-pressed="false" autocomplete="off">
-          <svg><circle id="rec-svg" cx="10" cy="10" r="8" fill="red"></circle></svg>
+          <svg class="svg"><circle id="rec-svg" cx="10" cy="10" r="8" fill="red"></circle></svg>
+        </button>
+        <button id="button-record-cloud" type="button" class="btn btn-success mx-1 mx-xl-2 my-2" title="Capture audio and video in the cloud" data-toggle="button" aria-pressed="false" autocomplete="off">
+          <%= require('../../node_modules/open-iconic/svg/cloud-upload.svg') %>
         </button>
       </div>
       <div class="col-4 col-lg-3 order-3 order-lg-3 text-right text-lg-right">
         <button id="button-meeting-leave" type="button" class="btn btn-outline-success mx-1 mx-xl-2 my-2 px-4" title="Leave meeting">
-          ${require('../../node_modules/open-iconic/svg/account-logout.svg').default}
+          <%= require('../../node_modules/open-iconic/svg/account-logout.svg') %>
         </button>
         <button id="button-meeting-end" type="button" class="btn btn-outline-danger mx-1 mx-xl-2 my-2 px-4" title="End meeting">
-          ${require('../../node_modules/open-iconic/svg/power-standby.svg').default}
+          <%= require('../../node_modules/open-iconic/svg/power-standby.svg') %>
         </button>
       </div>
     </div>
@@ -368,152 +519,9 @@
           </div>
         </div>
       </div>
-      <div id="tile-container" class="col-12 col-sm-7 col-md-8 col-lg-9 my-4 my-sm-0 h-100" style="overflow-y: scroll">
-        <div id="tile-area" class="v-grid">
-          <div id="tile-0" class="video-tile">
-            <video id="video-0" class="video-tile-video"></video>
-            <div id="attendeeid-0" class="video-tile-attendeeid"></div>
-            <div id="nameplate-0" class="video-tile-nameplate"></div>
-            <div id="pause-state-0"></div>
-            <button id="video-pause-0" class="video-tile-pause">Pause</button>
-            <button id="video-pin-0" class="video-tile-pin">Pin</button>
-          </div>
-          <div id="tile-1" class="video-tile">
-            <video id="video-1" class="video-tile-video"></video>
-            <div id="attendeeid-1" class="video-tile-attendeeid"></div>
-            <div id="nameplate-1" class="video-tile-nameplate"></div>
-            <div id="pause-state-1"></div>
-            <button id="video-pause-1" class="video-tile-pause">Pause</button>
-            <button id="video-pin-1" class="video-tile-pin">Pin</button>
-          </div>
-          <div id="tile-2" class="video-tile">
-            <video id="video-2" class="video-tile-video"></video>
-            <div id="attendeeid-2" class="video-tile-attendeeid"></div>
-            <div id="nameplate-2" class="video-tile-nameplate"></div>
-            <div id="pause-state-2"></div>
-            <button id="video-pause-2" class="video-tile-pause">Pause</button>
-            <button id="video-pin-2" class="video-tile-pin">Pin</button>
-          </div>
-          <div id="tile-3" class="video-tile">
-            <video id="video-3" class="video-tile-video"></video>
-            <div id="attendeeid-3" class="video-tile-attendeeid"></div>
-            <div id="nameplate-3" class="video-tile-nameplate"></div>
-            <div id="pause-state-3"></div>
-            <button id="video-pause-3" class="video-tile-pause">Pause</button>
-            <button id="video-pin-3" class="video-tile-pin">Pin</button>
-          </div>
-          <div id="tile-4" class="video-tile">
-            <video id="video-4" class="video-tile-video"></video>
-            <div id="attendeeid-4" class="video-tile-attendeeid"></div>
-            <div id="nameplate-4" class="video-tile-nameplate"></div>
-            <div id="pause-state-4"></div>
-            <button id="video-pause-4" class="video-tile-pause">Pause</button>
-            <button id="video-pin-4" class="video-tile-pin">Pin</button>
-          </div>
-          <div id="tile-5" class="video-tile">
-            <video id="video-5" class="video-tile-video"></video>
-            <div id="attendeeid-5" class="video-tile-attendeeid"></div>
-            <div id="nameplate-5" class="video-tile-nameplate"></div>
-            <div id="pause-state-5"></div>
-            <button id="video-pause-5" class="video-tile-pause">Pause</button>
-            <button id="video-pin-5" class="video-tile-pin">Pin</button>
-          </div>
-          <div id="tile-6" class="video-tile">
-            <video id="video-6" class="video-tile-video"></video>
-            <div id="attendeeid-6" class="video-tile-attendeeid"></div>
-            <div id="nameplate-6" class="video-tile-nameplate"></div>
-            <div id="pause-state-6"></div>
-            <button id="video-pause-6" class="video-tile-pause">Pause</button>
-            <button id="video-pin-6" class="video-tile-pin">Pin</button>
-          </div>
-          <div id="tile-7" class="video-tile">
-            <video id="video-7" class="video-tile-video"></video>
-            <div id="attendeeid-7" class="video-tile-attendeeid"></div>
-            <div id="nameplate-7" class="video-tile-nameplate"></div>
-            <div id="pause-state-7"></div>
-            <button id="video-pause-7" class="video-tile-pause">Pause</button>
-            <button id="video-pin-7" class="video-tile-pin">Pin</button>
-          </div>
-          <div id="tile-8" class="video-tile">
-            <video id="video-8" class="video-tile-video"></video>
-            <div id="attendeeid-8" class="video-tile-attendeeid"></div>
-            <div id="nameplate-8" class="video-tile-nameplate"></div>
-            <div id="pause-state-8"></div>
-            <button id="video-pause-8" class="video-tile-pause">Pause</button>
-            <button id="video-pin-8" class="video-tile-pin">Pin</button>
-          </div>
-          <div id="tile-9" class="video-tile">
-            <video id="video-9" class="video-tile-video"></video>
-            <div id="attendeeid-9" class="video-tile-attendeeid"></div>
-            <div id="nameplate-9" class="video-tile-nameplate"></div>
-            <div id="pause-state-9"></div>
-            <button id="video-pause-9" class="video-tile-pause">Pause</button>
-            <button id="video-pin-9" class="video-tile-pin">Pin</button>
-          </div>
-          <div id="tile-10" class="video-tile">
-            <video id="video-10" class="video-tile-video"></video>
-            <div id="attendeeid-10" class="video-tile-attendeeid"></div>
-            <div id="nameplate-10" class="video-tile-nameplate"></div>
-            <div id="pause-state-10"></div>
-            <button id="video-pause-10" class="video-tile-pause">Pause</button>
-            <button id="video-pin-10" class="video-tile-pin">Pin</button>
-          </div>
-          <div id="tile-11" class="video-tile">
-            <video id="video-11" class="video-tile-video"></video>
-            <div id="attendeeid-11" class="video-tile-attendeeid"></div>
-            <div id="nameplate-11" class="video-tile-nameplate"></div>
-            <div id="pause-state-11"></div>
-            <button id="video-pause-11" class="video-tile-pause">Pause</button>
-            <button id="video-pin-11" class="video-tile-pin">Pin</button>
-          </div>
-          <div id="tile-12" class="video-tile">
-            <video id="video-12" class="video-tile-video"></video>
-            <div id="attendeeid-12" class="video-tile-attendeeid"></div>
-            <div id="nameplate-12" class="video-tile-nameplate"></div>
-            <div id="pause-state-12"></div>
-            <button id="video-pause-12" class="video-tile-pause">Pause</button>
-            <button id="video-pin-12" class="video-tile-pin">Pin</button>
-          </div>
-          <div id="tile-13" class="video-tile">
-            <video id="video-13" class="video-tile-video"></video>
-            <div id="attendeeid-13" class="video-tile-attendeeid"></div>
-            <div id="nameplate-13" class="video-tile-nameplate"></div>
-            <div id="pause-state-13"></div>
-            <button id="video-pause-13" class="video-tile-pause">Pause</button>
-            <button id="video-pin-13" class="video-tile-pin">Pin</button>
-          </div>
-          <div id="tile-14" class="video-tile">
-            <video id="video-14" class="video-tile-video"></video>
-            <div id="attendeeid-14" class="video-tile-attendeeid"></div>
-            <div id="nameplate-14" class="video-tile-nameplate"></div>
-            <div id="pause-state-14"></div>
-            <button id="video-pause-14" class="video-tile-pause">Pause</button>
-            <button id="video-pin-14" class="video-tile-pin">Pin</button>
-          </div>
-          <div id="tile-15" class="video-tile">
-            <video id="video-15" class="video-tile-video"></video>
-            <div id="attendeeid-15" class="video-tile-attendeeid"></div>
-            <div id="nameplate-15" class="video-tile-nameplate"></div>
-            <div id="pause-state-15"></div>
-            <button id="video-pause-15" class="video-tile-pause">Pause</button>
-            <button id="video-pin-15" class="video-tile-pin">Pin</button>
-          </div>
-          <div id="tile-16" class="video-tile">
-            <video id="video-16" class="video-tile-video"></video>
-            <div id="attendeeid-16" class="video-tile-attendeeid"></div>
-            <div id="nameplate-16" class="video-tile-nameplate"></div>
-            <div id="pause-state-16"></div>
-            <button id="video-pause-16" class="video-tile-pause" class="btn">Pause</button>
-            <button id="video-pin-16" class="video-tile-pin" class="btn">Pin</button>
-          </div>
-          <div id="tile-17" class="video-tile">
-            <video id="video-17" class="video-tile-video"></video>
-            <div id="nameplate-17" class="video-tile-nameplate"></div>
-            <div id="pause-state-17"></div>
-            <button id="video-pause-17" class="video-tile-pause" class="btn">Pause</button>
-            <button id="video-pin-17" class="video-tile-pin" class="btn">Pin</button>
-          </div>
-        </div>
+      <div id="tile-transcript-container" class="d-flex flex-column col-12 col-sm-7 col-md-8 col-lg-9 my-4 my-sm-0 h-100" style="overflow-y: scroll">
+        <div id="tile-area" class="v-grid"></div>
+        <div id="transcript-container" class="transcript-container" style="display:none"></div>
       </div>
       <video id="content-share-video" playsinline crossOrigin="anonymous" style="display:none"></video>
     </div>

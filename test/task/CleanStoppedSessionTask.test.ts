@@ -22,14 +22,17 @@ import DefaultStatsCollector from '../../src/statscollector/DefaultStatsCollecto
 import CleanStoppedSessionTask from '../../src/task/CleanStoppedSessionTask';
 import Task from '../../src/task/Task';
 import DefaultTransceiverController from '../../src/transceivercontroller/DefaultTransceiverController';
+import { wait as delay } from '../../src/utils/Utils';
 import NoVideoDownlinkBandwidthPolicy from '../../src/videodownlinkbandwidthpolicy/NoVideoDownlinkBandwidthPolicy';
+import VideoAdaptiveProbePolicy from '../../src/videodownlinkbandwidthpolicy/VideoAdaptiveProbePolicy';
 import VideoTile from '../../src/videotile/VideoTile';
 import DefaultVideoTileController from '../../src/videotilecontroller/DefaultVideoTileController';
 import DefaultVideoTileFactory from '../../src/videotilefactory/DefaultVideoTileFactory';
+import NoVideoUplinkBandwidthPolicy from '../../src/videouplinkbandwidthpolicy/NoVideoUplinkBandwidthPolicy';
+import NScaleVideoUplinkBandwidthPolicy from '../../src/videouplinkbandwidthpolicy/NScaleVideoUplinkBandwidthPolicy';
 import DefaultWebSocketAdapter from '../../src/websocketadapter/DefaultWebSocketAdapter';
 import DOMMockBehavior from '../dommock/DOMMockBehavior';
 import DOMMockBuilder from '../dommock/DOMMockBuilder';
-import { delay } from '../utils';
 
 describe('CleanStoppedSessionTask', () => {
   const expect: Chai.ExpectStatic = chai.expect;
@@ -84,6 +87,7 @@ describe('CleanStoppedSessionTask', () => {
       context.logger,
       browserBehavior
     );
+    context.videoUplinkBandwidthPolicy = new NoVideoUplinkBandwidthPolicy();
     context.videoDownlinkBandwidthPolicy = new NoVideoDownlinkBandwidthPolicy();
     context.videoTileController = new DefaultVideoTileController(
       new DefaultVideoTileFactory(),
@@ -201,6 +205,34 @@ describe('CleanStoppedSessionTask', () => {
       task.run().then(() => {
         const localTile = context.videoTileController.getLocalVideoTile();
         expect(localTile.state().boundVideoStream).to.equal(null);
+        done();
+      });
+    });
+
+    it('clear transceiver from video uplink bandwidth if needed', done => {
+      context.videoUplinkBandwidthPolicy = new NScaleVideoUplinkBandwidthPolicy('');
+      context.videoUplinkBandwidthPolicy.setTransceiverController(context.transceiverController);
+      const spy = sinon.spy(context.videoUplinkBandwidthPolicy, 'setTransceiverController');
+
+      task.run().then(() => {
+        expect(spy.calledOnceWith(undefined)).to.be.true;
+        done();
+      });
+    });
+
+    it('clear tile controller from video downlink bandwidth if needed', done => {
+      context.videoDownlinkBandwidthPolicy = new VideoAdaptiveProbePolicy(context.logger);
+      context.videoDownlinkBandwidthPolicy.bindToTileController(
+        new DefaultVideoTileController(
+          new DefaultVideoTileFactory(),
+          context.audioVideoController,
+          context.logger
+        )
+      );
+      const spy = sinon.spy(context.videoDownlinkBandwidthPolicy, 'bindToTileController');
+
+      task.run().then(() => {
+        expect(spy.calledOnceWith(undefined)).to.be.true;
         done();
       });
     });

@@ -11,6 +11,14 @@ Parameters:
     Description: The AWS SDK Chime endpoint
     Default: "https://service.chime.aws.amazon.com"
     Type: String
+  ChimeServicePrincipal:
+    Description: "The principal that will capture to the S3 bucket"
+    Default: "chime.amazonaws.com"
+    Type: String
+  ChimeMediaCaptureS3BucketPrefix:
+    Description: Prefix of S3 bucket to write capture artifacts.  The bucket name will be suffixed with the region.
+    Default: ""
+    Type: String
 Conditions:
   ShouldUseEventBridge: !Equals [true, !Ref UseEventBridge]
 Globals:
@@ -25,7 +33,11 @@ Globals:
         BROWSER_LOG_GROUP_NAME: !Ref ChimeBrowserLogs
         BROWSER_MEETING_EVENT_LOG_GROUP_NAME: !Ref ChimeBrowserMeetingEventLogs
         CHIME_ENDPOINT: !Ref ChimeEndpoint
+        BROWSER_EVENT_INGESTION_LOG_GROUP_NAME: !Ref ChimeBrowserEventIngestionLogs
+        CAPTURE_S3_DESTINATION_PREFIX: !Ref ChimeMediaCaptureS3BucketPrefix
+        AWS_ACCOUNT_ID: !Sub "${AWS::AccountId}"
 Resources:
+
   ChimeMeetingsAccessPolicy:
     Type: AWS::IAM::Policy
     Properties:
@@ -46,10 +58,20 @@ Resources:
               - 'chime:DeleteAttendee'
               - 'chime:GetAttendee'
               - 'chime:ListAttendees'
+              - 'chime:StartMeetingTranscription'
+              - 'chime:StopMeetingTranscription'
+              - 'chime:CreateMediaCapturePipeline'
+              - 'chime:DeleteMediaCapturePipeline'
+              - 's3:GetBucketPolicy'
+              - 's3:GetBucketLocation'
             Resource: '*'
       Roles:
         - Ref: ChimeSdkJoinLambdaRole
         - Ref: ChimeSdkEndLambdaRole
+        - Ref: ChimeSdkStartTranscriptionLambdaRole
+        - Ref: ChimeSdkStopTranscriptionLambdaRole
+        - Ref: ChimeSdkStartCaptureLambdaRole
+        - Ref: ChimeSdkEndCaptureLambdaRole
   ChimeMessagingAccessPolicy:
     Type: AWS::IAM::Policy
     Properties:
@@ -82,6 +104,8 @@ Resources:
         - Ref: ChimeSdkBrowserMeetingEventLogsLambdaRole
         - Ref: ChimeSdkBrowserCreateLogStreamLambdaRole
         - Ref: ChimeSdkBrowserCreateBrowserEventLogStreamLambdaRole
+        - Ref: ChimeSdkBrowserEventIngestionLogsLambdaRole
+        - Ref: ChimeSdkBrowserEventIngestionLogStreamLambdaRole
   Meetings:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -114,7 +138,7 @@ Resources:
         - Sid: Allow access for Chime Service
           Effect: Allow
           Principal:
-            Service: chime.amazonaws.com
+            Service: !Ref ChimeServicePrincipal
           Action:
             - kms:GenerateDataKey
             - kms:Decrypt
@@ -146,6 +170,17 @@ Resources:
           Properties:
             Path: /
             Method: GET
+  ChimeSdkAudioFileLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers.audio_file
+      CodeUri: src/
+      Events:
+        Api1:
+          Type: Api
+          Properties:
+            Path: /audio_file
+            Method: GET
   ChimeSdkJoinLambda:
     Type: AWS::Serverless::Function
     Properties:
@@ -176,6 +211,37 @@ Resources:
           Type: Api
           Properties:
             Path: /end
+            Method: POST
+  ChimeSdkStartCaptureLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers.start_capture
+      CodeUri: src/
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref Meetings
+      Environment:
+        Variables:
+          USE_EVENT_BRIDGE: !Ref UseEventBridge
+      Events:
+        Api1:
+          Type: Api
+          Properties:
+            Path: /startCapture
+            Method: POST
+  ChimeSdkEndCaptureLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers.end_capture
+      CodeUri: src/
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref Meetings
+      Events:
+        Api1:
+          Type: Api
+          Properties:
+            Path: /endCapture
             Method: POST
   ChimeSQSQueueLambda:
     Type: AWS::Serverless::Function
@@ -232,6 +298,28 @@ Resources:
           Properties:
             Path: /log_meeting_event
             Method: POST
+  ChimeSdkBrowserEventIngestionLogsLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers.log_event_ingestion
+      CodeUri: src/
+      Events:
+        Api1:
+          Type: Api
+          Properties:
+            Path: /log_event_ingestion
+            Method: POST
+  ChimeSdkBrowserEventIngestionLogStreamLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers.create_browser_event_ingestion_log_stream
+      CodeUri: src/
+      Events:
+        Api1:
+          Type: Api
+          Properties:
+            Path: /create_browser_event_ingestion_log_stream
+            Method: POST
   ChimeSdkBrowserCreateLogStreamLambda:
     Type: AWS::Serverless::Function
     Properties:
@@ -253,6 +341,34 @@ Resources:
           Type: Api
           Properties:
             Path: /create_browser_event_log_stream
+            Method: POST
+  ChimeSdkStartTranscriptionLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers.start_transcription
+      CodeUri: src/
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref Meetings
+      Events:
+        Api1:
+          Type: Api
+          Properties:
+            Path: /start_transcription
+            Method: POST
+  ChimeSdkStopTranscriptionLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers.stop_transcription
+      CodeUri: src/
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref Meetings
+      Events:
+        Api1:
+          Type: Api
+          Properties:
+            Path: /stop_transcription
             Method: POST
   ChimeSdkBrowserFetchCredentialsLambda:
     Type: AWS::Serverless::Function
@@ -277,13 +393,15 @@ Resources:
               - sqs:GetQueueUrl
             Principal:
               Service:
-                - chime.amazonaws.com
+                - !Ref ChimeServicePrincipal
             Resource: !GetAtt MeetingNotificationsQueue.Arn
       Queues:
         - Ref: MeetingNotificationsQueue
   ChimeBrowserLogs:
     Type: AWS::Logs::LogGroup
   ChimeBrowserMeetingEventLogs:
+    Type: AWS::Logs::LogGroup
+  ChimeBrowserEventIngestionLogs:
     Type: AWS::Logs::LogGroup
   ChimeSdkBrowserMeetingEventDashboard:
     Type: AWS::CloudWatch::Dashboard
@@ -407,11 +525,25 @@ Resources:
                 {
                     "type": "text",
                     "x": 0,
-                    "y": 36,
+                    "y": 42,
                     "width": 24,
                     "height": 12,
                     "properties": {
                         "markdown": "\n## How to search events for a specific attendee?\n\nThe Chime SDK serverless demo uses Amazon CloudWatch Logs Insights to search and analyze SDK events. You can view trends in the types of failures and identify where your attendees drop off.\n\n1. Click on the row number (▶) to expand a row.\n2. You can see detailed failure information.\n  - **attributes.meetingErrorMessage** explains the reason for the meeting failure.\n  - **attributes.audioInputErrorMessage** and **attributes.videoInputErrorMessage** indicate problems with the microphone and camera.\n  - **attributes.meetingHistory** shows up to last 15 attendee actions and events.\n3. To view a specific attendee's events, take note of **attributes.attendeeId** and choose **Insights** in the navigation pane.\n4. Select your ChimeBrowserMeetingEventLogs log group that starts with your stack name.\n  ```\n  __your_stack_name__ChimeBrowserMeetingEventLogs-...\n  ```\n5. In the query editor, delete the current contents, enter the following filter function, and then choose **Run query**.\n  ```\n  filter attributes.attendeeId = \"__your_attendee_id__\"\n  ```\n\n  The results show the number of SDK events from device selection to meeting end.\n\n  You can use CloudWatch Logs Insights to count device input errors for platforms, calculate the average value of the signaling connection time, and visualize trends over time. For more information, see [Analyzing Log Data with CloudWatch Logs Insights](https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/AnalyzingLogData.html) in the *AWS CloudWatch Logs User Guide*.\n"
+                    }
+                },
+                {
+                    "type": "log",
+                    "x": 0,
+                    "y": 36,
+                    "width": 24,
+                    "height": 6,
+                    "properties": {
+                        "query": "SOURCE \"${Source}\" | filter name in [\"signalingDropped\"]\n| fields fromMillis(@timestamp) as timestamp,\nconcat(attributes.osName, \" \", attributes.osVersion) as operatingSystem,\nconcat(attributes.browserName, \" \", attributes.browserMajorVersion) as browser,\nconcat(attributes.signalingOpenDurationMs / 1000, \"s\")  as signalingOpenDurationMs,\nattributes.retryCount as retryCount\n| sort @timestamp desc\n",
+                        "region": "us-east-1",
+                        "stacked": false,
+                        "title": "WebSocket signaling failures",
+                        "view": "table"
                     }
                 },
                 {

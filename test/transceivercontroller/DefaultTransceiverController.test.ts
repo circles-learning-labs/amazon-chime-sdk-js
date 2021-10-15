@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import * as chai from 'chai';
+import * as sinon from 'sinon';
 
 import BrowserBehavior from '../../src/browserbehavior/BrowserBehavior';
 import DefaultBrowserBehavior from '../../src/browserbehavior/DefaultBrowserBehavior';
@@ -421,6 +422,44 @@ describe('DefaultTransceiverController', () => {
       verifyTransceiverDirections(['recvonly', 'recvonly']);
     });
 
+    it('will track the mapping of stream id to mid', () => {
+      const videoStreamIndex = prepareIndex([1, 4]);
+      const videosToReceive: VideoStreamIdSet = new DefaultVideoStreamIdSet([1]);
+      const videoSubscriptions: number[] = tc.updateVideoTransceivers(
+        videoStreamIndex,
+        videosToReceive
+      );
+      expect(videoSubscriptions).to.deep.equal([0, 1]);
+      const subackFrame = new SdkSubscribeAckFrame({
+        tracks: [new SdkTrackMapping({ streamId: 1, trackLabel: 'v_1' })],
+      });
+      videoStreamIndex.integrateSubscribeAckFrame(subackFrame);
+      setTransceiverStreamId(videosToReceive);
+
+      expect(tc.getMidForStreamId(1)).to.equal('1');
+    });
+
+    it('will allow overriding the mapping of stream id to mid', () => {
+      const videoStreamIndex = prepareIndex([1, 4]);
+      const videosToReceive: VideoStreamIdSet = new DefaultVideoStreamIdSet([1]);
+      const videoSubscriptions: number[] = tc.updateVideoTransceivers(
+        videoStreamIndex,
+        videosToReceive
+      );
+      expect(videoSubscriptions).to.deep.equal([0, 1]);
+      const subackFrame = new SdkSubscribeAckFrame({
+        tracks: [new SdkTrackMapping({ streamId: 1, trackLabel: 'v_1' })],
+      });
+      videoStreamIndex.integrateSubscribeAckFrame(subackFrame);
+      setTransceiverStreamId(videosToReceive);
+
+      expect(tc.getMidForStreamId(1)).to.equal('1');
+
+      tc.setStreamIdForMid('1', 2);
+      expect(tc.getMidForStreamId(2)).to.equal('1');
+      expect(tc.getMidForStreamId(1)).to.equal(undefined);
+    });
+
     it('will not reuse transceiver when unsubscribe from one and subscribe to another', () => {
       const videoStreamIndex = prepareIndex([1, 4]);
       let videosToReceive: VideoStreamIdSet = new DefaultVideoStreamIdSet([1]);
@@ -507,6 +546,33 @@ describe('DefaultTransceiverController', () => {
       expect(videoSubscriptions).to.deep.equal([0, streamId, 8]);
       verifyTransceiverDirections(['recvonly', 'recvonly']);
     });
+
+    it('will override stream ids via setStreamId', async () => {
+      const videoStreamIndex = prepareIndex([1, 4]);
+      let videosToReceive: VideoStreamIdSet = new DefaultVideoStreamIdSet([1]);
+      let videoSubscriptions: number[] = tc.updateVideoTransceivers(
+        videoStreamIndex,
+        videosToReceive
+      );
+      expect(videoSubscriptions).to.deep.equal([0, 1]);
+      verifyTransceiverDirections(['recvonly']);
+      const subackFrame = new SdkSubscribeAckFrame({
+        tracks: [new SdkTrackMapping({ streamId: 1, trackLabel: 'v_1' })],
+      });
+      videoStreamIndex.integrateSubscribeAckFrame(subackFrame);
+      setTransceiverStreamId(videosToReceive);
+
+      videosToReceive = new DefaultVideoStreamIdSet([4]);
+      videoSubscriptions = tc.updateVideoTransceivers(videoStreamIndex, videosToReceive);
+      expect(videoSubscriptions).to.deep.equal([0, 0, 4]);
+      verifyTransceiverDirections(['inactive', 'recvonly']);
+
+      const mid = tc.getMidForStreamId(1);
+      tc.setStreamIdForMid('otherMid', 2);
+      expect(tc.getMidForStreamId(1)).to.be.equal(mid);
+      tc.setStreamIdForMid(mid, 3);
+      expect(tc.getMidForStreamId(3)).to.be.equal(mid);
+    });
   });
 
   describe('setVideoSendingBitrateKbps', () => {
@@ -514,33 +580,30 @@ describe('DefaultTransceiverController', () => {
       tc.setVideoSendingBitrateKbps(100);
     });
 
-    it('sets bitrate on RTCRtpSender correctly', done => {
+    it('sets bitrate on RTCRtpSender correctly', async () => {
       const peer: RTCPeerConnection = new RTCPeerConnection();
       tc.setPeer(peer);
       tc.setupLocalTransceivers();
 
       const newVideoTrack = new MediaStreamTrack();
-      tc.setVideoInput(newVideoTrack);
+      await tc.setVideoInput(newVideoTrack);
 
-      new TimeoutScheduler(domMockBehavior.asyncWaitMs + 10).start(() => {
-        const videoTransceiver = peer.getTransceivers()[1];
-        expect(videoTransceiver.direction).to.equal('sendrecv');
-        expect(videoTransceiver.sender.track).to.equal(newVideoTrack);
+      const videoTransceiver = peer.getTransceivers()[1];
+      expect(videoTransceiver.direction).to.equal('sendrecv');
+      expect(videoTransceiver.sender.track).to.equal(newVideoTrack);
 
-        const parameter = {
-          degradationPreference: null,
-          transactionId: '',
-        } as RTCRtpSendParameters;
-        videoTransceiver.sender.setParameters(parameter);
-        tc.setVideoSendingBitrateKbps(100);
-      });
+      let parameter = {
+        degradationPreference: null,
+        transactionId: '',
+      } as RTCRtpSendParameters;
+      await videoTransceiver.sender.setParameters(parameter);
+      tc.setVideoSendingBitrateKbps(100);
+      parameter = peer.getTransceivers()[1].sender.getParameters();
+      expect(parameter.encodings[0].maxBitrate).to.equal(100 * 1000);
 
-      new TimeoutScheduler(domMockBehavior.asyncWaitMs + 10).start(() => {
-        tc.setVideoSendingBitrateKbps(200);
-        const parameter = peer.getTransceivers()[1].sender.getParameters();
-        expect(parameter.encodings[0].maxBitrate).to.equal(200 * 1000);
-        done();
-      });
+      tc.setVideoSendingBitrateKbps(200);
+      parameter = peer.getTransceivers()[1].sender.getParameters();
+      expect(parameter.encodings[0].maxBitrate).to.equal(200 * 1000);
     });
   });
 
@@ -588,6 +651,172 @@ describe('DefaultTransceiverController', () => {
       );
       expect(success).to.be.true;
       expect(sender.track).to.equal(audioTrack);
+    });
+  });
+
+  describe('setEncodingParameters', () => {
+    let getParamSpy: sinon.SinonSpy;
+    let setParamSpy: sinon.SinonSpy;
+    let peer: RTCPeerConnection;
+    beforeEach(() => {
+      peer = new RTCPeerConnection();
+      tc.setPeer(peer);
+      tc.setupLocalTransceivers();
+      getParamSpy = sinon.spy(peer.getTransceivers()[1].sender, 'getParameters');
+      setParamSpy = sinon.spy(peer.getTransceivers()[1].sender, 'setParameters');
+    });
+    afterEach(() => {
+      getParamSpy.restore();
+      setParamSpy.restore();
+    });
+
+    it('is no-op if local transceivers are not set up', async () => {
+      tc.setEncodingParameters(
+        new Map<string, RTCRtpEncodingParameters>().set('video', {
+          scaleResolutionDownBy: 1,
+          maxBitrate: 1_400_000,
+        })
+      );
+    });
+
+    it('is no-op if local video transceiver is inactive', async () => {
+      await tc.setEncodingParameters(
+        new Map<string, RTCRtpEncodingParameters>().set('video', {
+          scaleResolutionDownBy: 1,
+          maxBitrate: 1_400_000,
+        })
+      );
+      expect(tc.localVideoTransceiver().direction).to.equal('inactive');
+      expect(getParamSpy.notCalled).to.be.true;
+    });
+
+    it('Do not set encoding parameters if input params is empty', async () => {
+      const newVideoTrack = new MediaStreamTrack();
+      await tc.setVideoInput(newVideoTrack);
+
+      tc.setEncodingParameters(new Map<string, RTCRtpEncodingParameters>());
+
+      expect(getParamSpy.notCalled).to.be.true;
+      expect(setParamSpy.notCalled).to.be.true;
+    });
+
+    it('Set encoding parameters', async () => {
+      const newVideoTrack = new MediaStreamTrack();
+      await tc.setVideoInput(newVideoTrack);
+
+      const localSender = tc.localVideoTransceiver().sender;
+      await tc.setEncodingParameters(
+        new Map<string, RTCRtpEncodingParameters>().set('video', {
+          scaleResolutionDownBy: 1,
+          maxBitrate: 1_400_000,
+        })
+      );
+
+      expect(setParamSpy.calledOnce).to.be.true;
+      const params = localSender.getParameters();
+      expect(params.encodings.length).to.be.equal(1);
+      expect(params.encodings[0].maxBitrate).to.be.equal(1_400_000);
+      expect(params.encodings[0].scaleResolutionDownBy).to.be.equal(1);
+    });
+
+    it('Can update encoding parameters', async () => {
+      const newVideoTrack = new MediaStreamTrack();
+      await tc.setVideoInput(newVideoTrack);
+
+      const localSender = tc.localVideoTransceiver().sender;
+      await tc.setEncodingParameters(
+        new Map<string, RTCRtpEncodingParameters>().set('video', {
+          scaleResolutionDownBy: 1,
+          maxBitrate: 1_400_000,
+        })
+      );
+
+      expect(setParamSpy.calledOnce).to.be.true;
+      let params = localSender.getParameters();
+      expect(params.encodings.length).to.be.equal(1);
+      expect(params.encodings[0].maxBitrate).to.be.equal(1_400_000);
+      expect(params.encodings[0].scaleResolutionDownBy).to.be.equal(1);
+
+      await tc.setEncodingParameters(
+        new Map<string, RTCRtpEncodingParameters>().set('video', {
+          scaleResolutionDownBy: 2,
+          maxBitrate: 600_000,
+        })
+      );
+      expect(setParamSpy.calledTwice).to.be.true;
+      params = localSender.getParameters();
+      expect(params.encodings.length).to.be.equal(1);
+      expect(params.encodings[0].maxBitrate).to.be.equal(600_000);
+      expect(params.encodings[0].scaleResolutionDownBy).to.be.equal(2);
+    });
+
+    it('Only set encoding parameters with the same rid', async () => {
+      const newVideoTrack = new MediaStreamTrack();
+      await tc.setVideoInput(newVideoTrack);
+
+      const localSender = peer.getTransceivers()[1].sender;
+      await tc.setEncodingParameters(
+        new Map<string, RTCRtpEncodingParameters>().set('video', {
+          rid: 'video',
+          scaleResolutionDownBy: 1,
+          maxBitrate: 1_400_000,
+        })
+      );
+
+      expect(setParamSpy.calledOnce).to.be.true;
+      let params = localSender.getParameters();
+      expect(params.encodings.length).to.be.equal(1);
+      expect(params.encodings[0].maxBitrate).to.be.equal(1_400_000);
+      expect(params.encodings[0].scaleResolutionDownBy).to.be.equal(1);
+
+      await tc.setEncodingParameters(
+        new Map<string, RTCRtpEncodingParameters>().set('video', {
+          rid: 'video2',
+          scaleResolutionDownBy: 2,
+          maxBitrate: 600_000,
+        })
+      );
+      expect(setParamSpy.calledTwice).to.be.true;
+      params = localSender.getParameters();
+      expect(params.encodings.length).to.be.equal(1);
+      expect(params.encodings[0].maxBitrate).to.be.equal(1_400_000);
+      expect(params.encodings[0].scaleResolutionDownBy).to.be.equal(1);
+    });
+
+    it('Does not set codecPayloadType', async () => {
+      const newVideoTrack = new MediaStreamTrack();
+      await tc.setVideoInput(newVideoTrack);
+
+      const localSender = peer.getTransceivers()[1].sender;
+      await tc.setEncodingParameters(
+        new Map<string, RTCRtpEncodingParameters>().set('video', {
+          rid: 'video',
+          codecPayloadType: 1,
+          scaleResolutionDownBy: 1,
+          maxBitrate: 1_400_000,
+        })
+      );
+
+      expect(setParamSpy.calledOnce).to.be.true;
+      let params = localSender.getParameters();
+      expect(params.encodings.length).to.be.equal(1);
+      expect(params.encodings[0].maxBitrate).to.be.equal(1_400_000);
+      expect(params.encodings[0].scaleResolutionDownBy).to.be.equal(1);
+
+      await tc.setEncodingParameters(
+        new Map<string, RTCRtpEncodingParameters>().set('video', {
+          rid: 'video',
+          codecPayloadType: 2,
+          scaleResolutionDownBy: 2,
+          maxBitrate: 600_000,
+        })
+      );
+      expect(setParamSpy.calledTwice).to.be.true;
+      params = localSender.getParameters();
+      expect(params.encodings.length).to.be.equal(1);
+      expect(params.encodings[0].maxBitrate).to.be.equal(600_000);
+      expect(params.encodings[0].scaleResolutionDownBy).to.be.equal(2);
+      expect(params.encodings[0].codecPayloadType).to.be.equal(1);
     });
   });
 });

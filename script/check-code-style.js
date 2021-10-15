@@ -62,7 +62,9 @@ const components = () => {
         path.basename(dir) !== 'index.ts' &&
         !path.basename(dir).startsWith('.') &&
         !path.basename(dir).includes('signalingprotocol') &&
-        !path.basename(dir).includes('screensignalingprotocol')
+        !path.basename(dir).includes('screensignalingprotocol') &&
+        !path.basename(dir).includes('utils') && 
+        !path.basename(dir).includes('cspmonitor')
     );
 };
 
@@ -101,17 +103,6 @@ tests().forEach(file => {
     );
   }
 
-  const srcFile = file.replace(/^test/, 'src').replace('.test.ts', '.ts');
-  if (!fs.existsSync(srcFile)) {
-    const errorString = 'Ensure that a test file has a corresponding source file.';
-    failed(
-      file,
-      'does not have a corresponding source file',
-      errorString +
-        `\nFor example, the test file (${file}) should test the corresponding source file (${srcFile})`
-    );
-  }
-
   const basename = path.basename(file, '.test.ts');
   let describeCount = 0;
 
@@ -124,44 +115,6 @@ tests().forEach(file => {
   if (describeCount !== 1) {
     const errorString = 'Ensure that each test file has one top-level describe';
     failed(file, 'has more than one top-level describe', errorString);
-  } else if (!fileText.includes(`describe\(\'${basename}\'`)) {
-    console.log(`^describe\(\'${basename}\'`);
-    failed(
-      file,
-      'has an invalid top-level describe name',
-      `Ensure that the top-level describe name matches the filename excluding .test.ts.\nFor example, it should be ""`
-    );
-  }
-});
-
-components().forEach(component => {
-  if (isIgnored(component)) {
-    return;
-  }
-
-  if (component === 'voicefocus') {
-    // This rule does not make sense for Voice Focus.
-    return;
-  }
-
-  let hasMatchingInterface = false;
-  const componentDir = path.join('src', component);
-  walk(componentDir).forEach(file => {
-    if (
-      path.basename(file, '.ts').toLowerCase() === path.basename(componentDir) ||
-      path.basename(file, 'ComponentFactory.ts').toLowerCase() === path.basename(componentDir) ||
-      path.basename(file, '.d.ts').toLowerCase() === path.basename(componentDir)
-    ) {
-      hasMatchingInterface = true;
-    }
-  });
-
-  if (!hasMatchingInterface) {
-    failed(
-      componentDir,
-      'component does not have matching interface',
-      'Ensure that each component directory has an interface of the same name. \nFor example, src/foobar will have an interface src/foobar/FooBar.ts.'
-    );
   }
 });
 

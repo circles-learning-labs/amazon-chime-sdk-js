@@ -1,6 +1,6 @@
 {
   "name": "amazon-chime-sdk-js",
-  "version": "2.11.0",
+  "version": "2.18.0",
   "description": "Amazon Chime SDK for JavaScript",
   "main": "build/index.js",
   "types": "build/index.d.ts",
@@ -41,11 +41,13 @@
     "test:integration-video": "cd ./integration/js && npm run test -- video ",
     "test:integration-meeting-end": "cd ./integration/js && npm run test -- meeting_end ",
     "test:integration-screen-share": "cd ./integration/js && npm run test -- screen_share ",
-    "test:integration-content-share": "cd ./integration/js && npm run test -- content_share ",
+    "test:integration-content-share-test-suite-one": "cd ./integration/js && npm run test -- content_share_test_suite_one ",
+    "test:integration-content-share-test-suite-two": "cd ./integration/js && npm run test -- content_share_test_suite_two ",
     "test:integration-data-message": "cd ./integration/js && npm run test -- data_message ",
     "test:integration-meeting-readiness-checker": "cd ./integration/js && npm run test -- meeting_readiness_checker ",
     "test:integration-messaging": "cd ./integration/js && npm run test -- messaging ",
-    "test:integration-video-test-app": "cd ./integration/js && npm run test -- video_test_app "
+    "test:integration-video-test-app": "cd ./integration/js && npm run test -- video_test_app ",
+    "test:integration-transcription": "cd ./integration/js && npm run test -- transcription "
   },
   "devDependencies": {
     "@fluffy-spoon/substitute": "^1.89.0",
@@ -53,6 +55,7 @@
     "@types/chai-as-promised": "^7.1.0",
     "@types/mocha": "^5.2.6",
     "@types/sinon": "^7.0.12",
+    "@types/uuid": "^8.3.1",
     "@typescript-eslint/eslint-plugin": "^4.18.0",
     "@typescript-eslint/parser": "^4.18.0",
     "chai": "^4.2.0",

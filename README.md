@@ -1,4 +1,6 @@
 # Amazon Chime SDK for JavaScript
+[Amazon Chime SDK Project Board](https://github.com/orgs/aws/projects/12)
+
 [Amazon Chime SDK React Components](https://github.com/aws/amazon-chime-sdk-component-library-react)
 
 <a href="https://www.npmjs.com/package/amazon-chime-sdk-js"><img src="https://img.shields.io/npm/v/amazon-chime-sdk-js?style=flat-square"></a>
@@ -20,6 +22,8 @@ control meeting features such as audio mute and video tile bindings.
 
 If you are building a React application, consider using the [Amazon Chime SDK React Component Library](https://github.com/aws/amazon-chime-sdk-component-library-react) that supplies client-side state management and reusable UI components for common web interfaces used in audio and video conferencing applications. Amazon Chime also offers [Amazon Chime SDK for iOS](https://github.com/aws/amazon-chime-sdk-ios) and [Amazon Chime SDK for Android](https://github.com/aws/amazon-chime-sdk-android) for native mobile application development.
 
+The [Amazon Chime SDK Project Board](https://github.com/orgs/aws/projects/12) captures the status of community feature requests across all our repositories. The descriptions of the columns on the board are captured in this [guide](https://aws.github.io/amazon-chime-sdk-js/modules/projectboard.html).
+
 ## Resources
 
 - [Amazon Chime SDK Overview](https://aws.amazon.com/chime/chime-sdk/)
@@ -33,8 +37,11 @@ If you are building a React application, consider using the [Amazon Chime SDK Re
 - [High Level Architecture — Building a Meeting Application with the Amazon Chime SDK](https://aws.amazon.com/blogs/business-productivity/building-a-meeting-application-using-the-amazon-chime-sdk/)
 - [Understanding security in Amazon Chime](https://aws.amazon.com/blogs/business-productivity/understanding-security-in-the-amazon-chime-application-and-sdk/)
 - [Transforming audio and shared content](https://aws.amazon.com/blogs/business-productivity/transforming-audio-and-shared-content-in-the-amazon-chime-sdk-for-javascript/)
+- [Capturing Amazon Chime SDK Meeting Content](https://aws.amazon.com/blogs/business-productivity/capture-amazon-chime-sdk-meetings-using-media-capture-pipelines/)
+- [Quickly launch an Amazon Chime SDK application with AWS Amplify](https://aws.amazon.com/blogs/business-productivity/quickly-launch-an-amazon-chime-sdk-application-with-aws-amplify/)
+- [Monitoring and troubleshooting with Amazon Chime SDK meeting events](https://aws.amazon.com/blogs/business-productivity/monitoring-and-troubleshooting-with-amazon-chime-sdk-meeting-events/)
 
-Here is a [list of all blog posts about the Amazon Chime SDK](https://aws.amazon.com/blogs/business-productivity/tag/amazon-chime-sdk/).
+Here is a list of all blog posts about the Amazon Chime SDK](https://aws.amazon.com/blogs/business-productivity/tag/amazon-chime-sdk/).
 
 ### Webinars and videos
 
@@ -44,7 +51,6 @@ Here is a [list of all blog posts about the Amazon Chime SDK](https://aws.amazon
 
 The following developer guides cover specific topics for a technical audience.
 
-- [Getting Started](https://aws.github.io/amazon-chime-sdk-js/modules/gettingstarted.html)
 - [API Overview](https://aws.github.io/amazon-chime-sdk-js/modules/apioverview.html)
 - [Frequently Asked Questions (FAQ)](https://aws.github.io/amazon-chime-sdk-js/modules/faqs.html)
 - [Content Share](https://aws.github.io/amazon-chime-sdk-js/modules/contentshare.html)
@@ -54,6 +60,8 @@ The following developer guides cover specific topics for a technical audience.
 - [Integrating Amazon Voice Focus into your application](https://aws.github.io/amazon-chime-sdk-js/modules/amazonvoice_focus.html)
 - [Adding frame-by-frame processing to an outgoing video stream](https://aws.github.io/amazon-chime-sdk-js/modules/videoprocessor.html)
 - [Adapting video to limited bandwidth using a priority-based video downlink policy](https://aws.github.io/amazon-chime-sdk-js/modules/prioritybased_downlink_policy.html)
+- [Client event ingestion](https://aws.github.io/amazon-chime-sdk-js/modules/clientevent_ingestion.html)
+- [Content Security Policy](https://aws.github.io/amazon-chime-sdk-js/modules/contentsecurity_policy.html)
 
 ## Migration Guides
 - [Migrating from v1.0 to v2.0](https://aws.github.io/amazon-chime-sdk-js/modules/migrationto_2_0.html)
@@ -64,16 +72,20 @@ The following developer guides cover specific topics for a technical audience.
 - [Meeting Demo](https://github.com/aws/amazon-chime-sdk-js/tree/master/demos/browser) — A browser
  meeting application with a local server
 - [Serverless Meeting Demo](https://github.com/aws/amazon-chime-sdk-js/tree/master/demos/serverless) — A self-contained serverless meeting application
-- [Single JS](https://github.com/aws/amazon-chime-sdk-js/tree/master/demos/singlejs) — A script to bundle the SDK into a single `.js` file
+- [Single JS](https://github.com/aws-samples/amazon-chime-sdk/tree/main/utils/singlejs) — A script to bundle the SDK into a single `.js` file
 - [Recording Demo](https://aws.amazon.com/blogs/business-productivity/how-to-enable-client-side-recording-using-the-amazon-chime-sdk/) — Recording the meeting's audio, video and screen share in high definition
 - [Virtual Classroom](https://aws.amazon.com/blogs/business-productivity/building-a-virtual-classroom-application-using-the-amazon-chime-sdk/) — An online classroom built with Electron and React
 - [Live Events](https://aws.amazon.com/blogs/opensource/how-to-deploy-a-live-events-solution-built-with-the-amazon-chime-sdk/) — Interactive live events solution
-- [Amazon Chime SDK Smart Video Sending Demo](https://aws.amazon.com/blogs/business-productivity/amazon-chime-sdk-smart-video-sending-demo/) — Demo showcasing how to dynamically display up to 16 video tiles from a pool of up to 250 meeting attendees
+- [Amazon Chime SDK Smart Video Sending Demo](https://aws.amazon.com/blogs/business-productivity/amazon-chime-sdk-smart-video-sending-demo/) — Demo showcasing how to dynamically display up to 25 video tiles from a pool of up to 250 meeting attendees
 - [Amazon Chime SDK and Amazon Connect Integration](https://aws.amazon.com/blogs/business-productivity/build-a-video-contact-center-with-amazon-connect-and-amazon-chime-sdk/) — Build a video contact center with Amazon Connect and Amazon Chime SDK
-- [PSTN Dial In](https://github.com/aws-samples/chime-sipmediaapplication-samples) —  Add PSTN dialin capabilities to your Amazon Chime SDK Meeting using SIP Media Application
 - [Device Integration](https://aws.amazon.com/blogs/business-productivity/using-the-amazon-chime-sdk-for-3rd-party-devices/) — Using the Amazon Chime SDK for 3rd party devices
 - [Messaging](https://aws.amazon.com/blogs/business-productivity/build-chat-features-into-your-application-with-amazon-chime-sdk-messaging/) — Build chat features into your application with Amazon Chime SDK messaging
 
+### SIP Media Application Examples
+- [PSTN Dial In](https://github.com/aws-samples/chime-sipmediaapplication-samples) —  Add PSTN dialin capabilities to your Amazon Chime SDK Meeting using SIP media application
+- [Outbound Call Notifications](https://github.com/aws-samples/amazon-chime-sma-outbound-call-notifications) - Send meeting reminders with SIP media application and get real time results back.
+- [Update In-Progress Call](https://github.com/aws-samples/amazon-chime-sma-update-call) - Update an in-progress SIP media application call via API call
+  
 ## Troubleshooting and Support
 Review the resources given in the ReadMe and use our [client documentation](https://aws.github.io/amazon-chime-sdk-js/) for guidance on how to develop on the Chime SDK for JavaScript. Additionally, search our [issues database](https://github.com/aws/amazon-chime-sdk-js/issues) and [FAQs](https://aws.github.io/amazon-chime-sdk-js/modules/faqs.html) to see if your issue is already addressed. If not please cut us an [issue](https://github.com/aws/amazon-chime-sdk-js/issues/new/choose) using the provided templates.
 
@@ -205,6 +217,12 @@ Tags are fetched in order to correctly generate versioning metadata.
 To view code coverage results open `coverage/index.html` in your browser
 after running `npm run test`.
 
+If you run `npm run test` and the tests are running but the coverage report is not getting generated
+then you might have a resource clean up issue. In Mocha v4.0.0 or newer the implementation was changed so 
+that the Mocha processes will not force exit when the test run is complete. <br /> For example, if you have a 
+`DefaultVideoTransformDevice` in your unit test then you must call `await device.stop();` to clean up the
+resources and not run into this issue. You can also look into the usage of `done();` in the [Mocha documentation](https://mochajs.org/#asynchronous-code). 
+
 ## Generating the documentation
 
 To generate JavaScript API reference documentation run:
@@ -285,6 +303,9 @@ await meetingSession.audioVideo.chooseVideoInputDevice(null);
 For example, when you pair Bluetooth headsets with your computer, `audioInputsChanged` and `audioOutputsChanged` are called
 with the device list including headsets.
 
+You can use the `audioInputMuteStateChanged` callback to track the underlying
+hardware mute state on browsers and operating systems that support that.
+
 ```js
 const observer = {
   audioInputsChanged: freshAudioInputDeviceList => {
@@ -293,12 +314,18 @@ const observer = {
       console.log(`Device ID: ${mediaDeviceInfo.deviceId} Microphone: ${mediaDeviceInfo.label}`);
     });
   },
+
   audioOutputsChanged: freshAudioOutputDeviceList => {
     console.log('Audio outputs updated: ', freshAudioOutputDeviceList);
   },
+
   videoInputsChanged: freshVideoInputDeviceList => {
     console.log('Video inputs updated: ', freshVideoInputDeviceList);
-  }
+  },
+
+  audioInputMuteStateChanged: (device, muted) => {
+    console.log('Device', device, muted ? 'is muted in hardware' : 'is not muted);
+  },
 };
 
 meetingSession.audioVideo.addDeviceChangeObserver(observer);
@@ -576,39 +603,41 @@ const observer = {
 meetingSession.audioVideo.addObserver(observer);
 ```
 
-**Use case 16.** View up to 16 attendee videos. Assume that you have 16 video elements in your application,
+**Use case 16.** View up to 25 attendee videos. Assume that you have 25 video elements in your application,
 and that an empty cell means it's taken.
 
 ```js
 /*
-  No one is sharing video               e.g. 9 attendee videos (9 empty cells)
+  No one is sharing video                    e.g. 9 attendee videos (9 empty cells)
 
-  Next available:                       Next available:
-  videoElements[0]                      videoElements[7]
-  ╔════╦════╦════╦════╗                 ╔════╦════╦════╦════╗
-  ║  0 ║  1 ║  2 ║  3 ║                 ║    ║    ║    ║    ║
-  ╠════╬════╬════╬════╣                 ╠════╬════╬════╬════╣
-  ║  4 ║  5 ║  6 ║  7 ║                 ║    ║    ║    ║  7 ║
-  ╠════╬════╬════╬════╣                 ╠════╬════╬════╬════╣
-  ║  8 ║  9 ║ 10 ║ 11 ║                 ║  8 ║    ║ 10 ║    ║
-  ╠════╬════╬════╬════╣                 ╠════╬════╬════╬════╣
-  ║ 12 ║ 13 ║ 14 ║ 15 ║                 ║ 12 ║ 13 ║ 14 ║ 15 ║
-  ╚════╩════╩════╩════╝                 ╚════╩════╩════╩════╝
+  Next available:                            Next available:
+  videoElements[0]                           videoElements[7]
+  ╔════╦════╦════╦════╦════╗                 ╔════╦════╦════╦════╦════╗
+  ║  0 ║  1 ║  2 ║  3 ║  4 ║                 ║    ║    ║    ║    ║    ║
+  ╠════╬════╬════╬════╬════╣                 ╠════╬════╬════╬════╬════╣
+  ║  5 ║  6 ║  7 ║  8 ║  9 ║                 ║    ║    ║  7 ║  8 ║    ║
+  ╠════╬════╬════╬════╬════╣                 ╠════╬════╬════╬════╬════╣
+  ║ 10 ║ 11 ║ 12 ║ 13 ║ 14 ║                 ║ 10 ║    ║ 12 ║ 13 ║ 14 ║
+  ╠════╬════╬════╬════╬════╣                 ╠════╬════╬════╬════╬════╣
+  ║ 15 ║ 16 ║ 17 ║ 18 ║ 19 ║                 ║ 15 ║ 16 ║ 17 ║ 18 ║ 19 ║
+  ╠════╬════╬════╬════╬════╣                 ╠════╬════╬════╬════╬════╣
+  ║ 20 ║ 21 ║ 22 ║ 23 ║ 24 ║                 ║ 20 ║ 21 ║ 22 ║ 23 ║ 24 ║
+  ╚════╩════╩════╩════╩════╝                 ╚════╩════╩════╩════╩════╝
  */
-const videoElements = [/* an array of 16 HTMLVideoElement objects in your application */];
+const videoElements = [/* an array of 25 HTMLVideoElement objects in your application */];
 
 // index-tileId pairs
 const indexMap = {};
 
 const acquireVideoElement = tileId => {
   // Return the same video element if already bound.
-  for (let i = 0; i < 16; i += 1) {
+  for (let i = 0; i < 25; i += 1) {
     if (indexMap[i] === tileId) {
       return videoElements[i];
     }
   }
   // Return the next available video element.
-  for (let i = 0; i < 16; i += 1) {
+  for (let i = 0; i < 25; i += 1) {
     if (!indexMap.hasOwnProperty(i)) {
       indexMap[i] = tileId;
       return videoElements[i];
@@ -618,7 +647,7 @@ const acquireVideoElement = tileId => {
 };
 
 const releaseVideoElement = tileId => {
-  for (let i = 0; i < 16; i += 1) {
+  for (let i = 0; i < 25; i += 1) {
     if (indexMap[i] === tileId) {
       delete indexMap[i];
       return;
@@ -916,7 +945,7 @@ const observer = {
     console.log('Recommend turning off your video');
   },
   videoSendDidBecomeUnavailable: () => {
-    // Chime SDK allows a total of 16 simultaneous videos per meeting.
+    // Chime SDK allows a total of 25 simultaneous videos per meeting.
     // If you try to share more video, this method will be called.
     // See videoAvailabilityDidChange below to find out when it becomes available.
     console.log('You cannot share your video');
@@ -1123,6 +1152,10 @@ The use of Amazon Voice Focus runtime code is subject to additional notices. See
 The browser demo applications in the [demos directory](https://github.com/aws/amazon-chime-sdk-js/tree/master/demos) use [TensorFlow.js](https://github.com/tensorflow/tfjs) and pre-trained [TensorFlow.js models](https://github.com/tensorflow/tfjs-models) for image segmentation. Use of these third party models involves downloading and execution of code at runtime from [jsDelivr](https://www.jsdelivr.com/) by end user browsers. For the jsDelivr Acceptable Use Policy, please visit this [link](https://www.jsdelivr.com/terms/acceptable-use-policy-jsdelivr-net).
 
 The use of TensorFlow runtime code referenced above may be subject to additional license requirements. See the licenses page for TensorFlow.js [here](https://github.com/tensorflow/tfjs/blob/master/LICENSE) and TensorFlow.js models [here](https://github.com/tensorflow/tfjs-models/blob/master/LICENSE) for details.
+
+Live transcription using the Amazon Chime SDK for JavaScript is powered by Amazon Transcribe. Use of Amazon Transcribe is subject to the [AWS Service Terms](https://aws.amazon.com/service-terms/), including the terms specific to the AWS Machine Learning and Artificial Intelligence Services. Standard charges for Amazon Transcribe and Amazon Transcribe Medical will apply.
+
+You and your end users understand that recording Amazon Chime SDK meetings may be subject to laws or regulations regarding the recording of electronic communications. It is your and your end users’ responsibility to comply with all applicable laws regarding the recordings, including properly notifying all participants in a recorded session, or communication that the session or communication is being recorded, and obtain their consent.
 
 ---
 

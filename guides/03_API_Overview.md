@@ -22,7 +22,11 @@ Create a [DefaultDeviceController](https://aws.github.io/amazon-chime-sdk-js/cla
 const deviceController = new DefaultDeviceController(logger);
 ```
 
-### 1c. Create a meeting session configuration
+### 1c. Create a meeting from your server application
+
+Use AWS SDK to create the Chime object. Use the Chime object to get meeting and attendee objects from [CreateMeeting](https://docs.aws.amazon.com/chime/latest/APIReference/API_CreateMeeting.html) and [CreateAttendee](https://docs.aws.amazon.com/chime/latest/APIReference/API_CreateAttendee.html) Chime APIs. See [Getting responses from your server application](https://github.com/aws/amazon-chime-sdk-js#getting-responses-from-your-server-application) for more information.
+
+### 1d. Create a meeting session configuration
 
 Create a [MeetingSessionConfiguration](https://aws.github.io/amazon-chime-sdk-js/classes/meetingsessionconfiguration.html#constructor) object with the responses to [chime:CreateMeeting](https://docs.aws.amazon.com/chime/latest/APIReference/API_CreateMeeting.html) and [chime:CreateAttendee](https://docs.aws.amazon.com/chime/latest/APIReference/API_CreateAttendee.html). Your server application should make these API calls and securely pass the meeting and attendee responses to the browser client application.
 
@@ -30,7 +34,7 @@ Create a [MeetingSessionConfiguration](https://aws.github.io/amazon-chime-sdk-js
 const configuration = new MeetingSessionConfiguration(meetingResponse, attendeeResponse);
 ```
 
-### 1d. Create a meeting session
+### 1e. Create a meeting session
 
 Using the above objects, create a [DefaultMeetingSession](https://aws.github.io/amazon-chime-sdk-js/classes/defaultmeetingsession.html#constructor).
 
@@ -48,6 +52,46 @@ When obtaining devices to configure, the browser may initially decline to provid
 
 You can override the behavior of the device-label trigger by calling meetingSession.audioVideo.[setDeviceLabelTrigger(trigger)](https://aws.github.io/amazon-chime-sdk-js/interfaces/audiovideofacade.html#setdevicelabeltrigger).
 
+#### Implement a view-only/observer/spectator experience
+
+To enable a view-only experience, you need to control the device permission prompts for audio and video. We suggest that you implement it based on `deviceLabelsTrigger`. By following this, you can achieve it with just little changes.
+
+Note: The view-only mode doesn't impact the ability to view content or listen to audio in your meeting experience.
+
+To suppress device permission prompts, let `deviceLabelTrigger` return an empty `MediaStream` before joining the meeting. Since it's an empty stream, the device permission prompts can't be triggered.
+
+Note: Chrome and Safari don't expose the `deviceId` without granting device permission, but Firefox do. In Firefox, if you try to select the device with `deviceId`, the device permission prompts will be triggered.
+
+To invoke device permission prompts, let `deviceLabelTrigger` return a `MediaStream` that contains your desired device kind. You can trigger it to grant device permission to the browser. After that, list and select the devices to regain the access to devices.
+
+```js
+// Suppress devices
+audioVideo.setDeviceLabelTrigger(() => Promise.resolve(new MediaStream()));
+
+audioVideo.start();
+
+// Invoke devices
+audioVideo.setDeviceLabelTrigger(async () => 
+  await navigator.mediaDevices.getUserMedia({ audio: true, video: true })
+);
+const audioInputDevices = await meetingSession.audioVideo.listAudioInputDevices();
+const audioOutputDevices = await meetingSession.audioVideo.listAudioOutputDevices();
+const videoInputDevices = await meetingSession.audioVideo.listVideoInputDevices();
+await meetingSession.audioVideo.chooseAudioInputDevice(audioInputDevice.deviceId);
+await meetingSession.audioVideo.chooseAudioOutputDevice(audioOutputDevice.deviceId);
+await meetingSession.audioVideo.chooseVideoInputDevice(videoInputDevices.deviceId);
+```
+
+#### Safari user are not able to join the meeting in view-only mode
+
+Safari users may not be able to successfully join the meeting in view-only mode, due to this known issue [#474](https://github.com/aws/amazon-chime-sdk-js/issues/474). Since we are still working on this, you can fix it locally by allowing Safari's Autoplay. The specific steps are:
+
+1. Open your application in the Safari app on your Mac.
+2. Choose Safari > Settings for This Website.
+  You can also Control-click in the Smart Search field, then choose Settings for This Website.
+3. Hold the pointer to the right of Auto-Play, then click the pop-up menu and choose the option:
+    * Allow All Auto-Play: Lets videos on this website play automatically.
+
 ### 2b. Register a device-change observer (optional)
 
 You can receive events about changes to available devices by implementing a [DeviceChangeObserver](https://aws.github.io/amazon-chime-sdk-js/interfaces/devicechangeobserver.html) and registering the observer with the device controller.
@@ -61,6 +105,7 @@ You can implement the following callbacks:
 * [audioInputsChanged](https://aws.github.io/amazon-chime-sdk-js/interfaces/devicechangeobserver.html#audioinputschanged): occurs when audio inputs are changed
 * [audioOutputsChanged](https://aws.github.io/amazon-chime-sdk-js/interfaces/devicechangeobserver.html#audiooutputschanged): occurs when audio outputs are changed
 * [videoInputsChanged](https://aws.github.io/amazon-chime-sdk-js/interfaces/devicechangeobserver.html#videoinputschanged): occurs when video inputs are changed
+* [audioInputMuteStateChanged](https://aws.github.io/amazon-chime-sdk-js/interfaces/devicechangeobserver.html#audioinputmutestatechanged): occurs when the underlying OS or hardware mute setting is detected on an audio track input
 
 ### 2c. Configure the audio input device
 
@@ -126,7 +171,7 @@ You should implement the following key observer callbacks:
 * [videoTileDidUpdate](https://aws.github.io/amazon-chime-sdk-js/interfaces/audiovideoobserver.html#videotiledidupdate): occurs when either a video stream is started or updated. Use the provided VideoTileState to determine the tile ID and the attendee ID of the video stream.
 * [videoTileWasRemoved](https://aws.github.io/amazon-chime-sdk-js/interfaces/audiovideoobserver.html#videotilewasremoved): occurs when a video stream stops and the reference to the tile (the tile ID) is deleted
 * [videoAvailabilityDidChange](https://aws.github.io/amazon-chime-sdk-js/interfaces/audiovideoobserver.html#videoavailabilitydidchange): occurs video availability state has changed such as whether the attendee can start local video or whether remote video is available. See [MeetingSessionVideoAvailability](https://aws.github.io/amazon-chime-sdk-js/classes/meetingsessionvideoavailability.html) for more information.
-* [videoSendDidBecomeUnavailable](https://aws.github.io/amazon-chime-sdk-js/interfaces/audiovideoobserver.html#videosenddidbecomeunavailable): occurs when attendee tries to start video but the maximum video limit of 16 tiles has already been reached by other attendees sharing their video
+* [videoSendDidBecomeUnavailable](https://aws.github.io/amazon-chime-sdk-js/interfaces/audiovideoobserver.html#videosenddidbecomeunavailable): occurs when attendee tries to start video but the maximum video limit of 25 tiles has already been reached by other attendees sharing their video
 
 You may optionally listen to the following callbacks to monitor aspects of connection health:
 
@@ -142,9 +187,9 @@ You may optionally listen to the following callbacks to monitor aspects of conne
 
 ## 4. Start and stop the session
 
-After completing configuration of audio and video (see previous sections) call `meetingSession.audioVideo.[start()](https://aws.github.io/amazon-chime-sdk-js/interfaces/audiovideofacade.html#start)`. This method will initialize all underlying components, set up connections, and immediately start sending and receiving audio.
+After completing configuration of audio and video (see previous sections) call meetingSession.audioVideo.[start()](https://aws.github.io/amazon-chime-sdk-js/interfaces/audiovideofacade.html#start). This method will initialize all underlying components, set up connections, and immediately start sending and receiving audio.
 
-To stop the meeting session, call `meetingSession.audioVideo.[stop()](https://aws.github.io/amazon-chime-sdk-js/interfaces/audiovideofacade.html#stop)`.
+To stop the meeting session, call meetingSession.audioVideo.[stop()](https://aws.github.io/amazon-chime-sdk-js/interfaces/audiovideofacade.html#stop).
 
 The `stop()` method does not clean up observers. You can start and stop a session multiple times using the same observers. In other words observers are not tied to the lifecycle of the session.
 
@@ -251,7 +296,7 @@ You are responsible for maintaining HTMLVideoElement objects in the DOM and arra
 
 To unbind a tile, call meetingSession.audioVideo.[unbindVideoElement(tileId)](https://aws.github.io/amazon-chime-sdk-js/interfaces/audiovideofacade.html#unbindvideoelement).
 
-A `tileId` is a unique identifier representing a video stream. When you stop and start, it generates a new `tileId`. You can have tileIds exceeding 16; they merely identify a particular stream uniquely. When you start video it consumes a video publishing slot, when you stop video it releases that video publishing slot. Pausing does not affect video publishing slots; it allows a remote to choose to not receive a video stream (and thus not consume bandwidth and CPU for that stream).
+A `tileId` is a unique identifier representing a video stream. When you stop and start, it generates a new `tileId`. You can have tileIds exceeding 25; they merely identify a particular stream uniquely. When you start video it consumes a video publishing slot, when you stop video it releases that video publishing slot. Pausing does not affect video publishing slots; it allows a remote to choose to not receive a video stream (and thus not consume bandwidth and CPU for that stream).
 
 ### 7c. Pause and unpause video (optional)
 
@@ -316,6 +361,10 @@ To receive messages on a given topic, set up a handler using the meetingSession.
 
 To unsubscribe the receive message handler, call meetingSession.audioVideo.[realtimeUnsubscribeFromReceiveDataMessage()](https://aws.github.io/amazon-chime-sdk-js/interfaces/audiovideofacade.html#realtimeunsubscribefromreceivedatamessage).
 
-If you send too many messages at once, your messages may be returned to you with the [throttled](https://aws.github.io/amazon-chime-sdk-js/classes/datamessage.html#throttled) flag set. The current throttling soft limit for Data Messages is Rate: 100, Burst: 200. If you continue to exceed the throttle limit (hard limit: Rate: 500, Burst: 10000), then the server may hang up the connection.
+If you send too many messages at once, your messages may be returned to you with the [throttled](https://aws.github.io/amazon-chime-sdk-js/classes/datamessage.html#throttled) flag set. The current throttling soft limit for Data 
+Messages is 100 messages per second with the maximum burst size of 200 for a meeting (i.e. a 'token bucket' of size 
+200 that refills at 100 tokens per second). If you continue to exceed the throttle limit, then the server may hang up the connection. The hard limit for each attendee is 200 
+messages per second with the maximum burst of 2000 and for a meeting is 500 messages per second with the maximum 
+burst of 10000.
 
 **Note:** Take care when using data messages for functionality involving *asymmetric permissions* (e.g. a moderator attendee sending a message to regular attendees). Any attendee may, in theory, send any message on any topic. You should always confirm that the message's [senderAttendeeId](https://aws.github.io/amazon-chime-sdk-js/classes/datamessage.html#senderattendeeid) belongs to an attendee that is allowed to send that type of message, and your handler should tolerate messages that are not serialized in the format you are expecting.

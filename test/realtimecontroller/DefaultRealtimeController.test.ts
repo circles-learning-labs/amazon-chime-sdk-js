@@ -1142,6 +1142,13 @@ describe('DefaultRealtimeController', () => {
     });
   });
 
+  describe('transcription controller', () => {
+    it('can get transcriptionController', () => {
+      const rt: RealtimeController = new DefaultRealtimeController();
+      expect(rt.transcriptionController).to.not.equal(null);
+    });
+  });
+
   describe('unsubscribe', () => {
     it('can unsubscribe from callbacks', () => {
       const rt: RealtimeController = new DefaultRealtimeController();
@@ -1258,8 +1265,10 @@ describe('DefaultRealtimeController', () => {
 
   // Most of these cannot occur unless the state object is somehow damaged.
   describe('unusual failures', () => {
-    function matchError(message: string): sinon.SinonMatcher {
-      return sinon.match.instanceOf(Error).and(sinon.match.has('message', message));
+    function matchError(message: string, altMessage: string = ''): sinon.SinonMatcher {
+      return sinon.match
+        .instanceOf(Error)
+        .and(sinon.match.has('message', message).or(sinon.match.has('message', altMessage)));
     }
 
     it('handles broken attendeeIdChangesCallbacks', () => {
@@ -1274,7 +1283,10 @@ describe('DefaultRealtimeController', () => {
 
       rt.realtimeSubscribeToAttendeeIdPresence((_a, _p) => {});
       expect(fatal.calledOnce).to.be.true;
-      const match = matchError("Cannot read property 'push' of undefined");
+      const match = matchError(
+        "Cannot read property 'push' of undefined",
+        "Cannot read properties of undefined (reading 'push')"
+      );
       expect(fatal.calledWith(match)).to.be.true;
 
       rt.realtimeUnsubscribeToAttendeeIdPresence((_a, _p) => {});
@@ -1293,12 +1305,18 @@ describe('DefaultRealtimeController', () => {
 
       rt.realtimeSubscribeToSetCanUnmuteLocalAudio(_m => {});
       expect(fatal.calledOnce).to.be.true;
-      const match = matchError("Cannot read property 'push' of undefined");
+      const match = matchError(
+        "Cannot read property 'push' of undefined",
+        "Cannot read properties of undefined (reading 'push')"
+      );
       expect(fatal.calledWith(match)).to.be.true;
       fatal.reset();
 
       rt.realtimeUnsubscribeToSetCanUnmuteLocalAudio(_m => {});
-      const matchUn = matchError("Cannot read property 'indexOf' of undefined");
+      const matchUn = matchError(
+        "Cannot read property 'indexOf' of undefined",
+        "Cannot read properties of undefined (reading 'indexOf')"
+      );
       expect(fatal.calledWith(matchUn)).to.be.true;
     });
 
@@ -1314,7 +1332,10 @@ describe('DefaultRealtimeController', () => {
 
       rt.realtimeSubscribeToVolumeIndicator('a', (_a, _v, _m, _s) => {});
       expect(fatal.calledOnce).to.be.true;
-      const match = matchError("Cannot read property 'hasOwnProperty' of undefined");
+      const match = matchError(
+        "Cannot read property 'hasOwnProperty' of undefined",
+        "Cannot read properties of undefined (reading 'hasOwnProperty')"
+      );
       expect(fatal.calledWith(match)).to.be.true;
       fatal.reset();
 
@@ -1335,15 +1356,23 @@ describe('DefaultRealtimeController', () => {
 
       rt.realtimeSubscribeToLocalSignalStrengthChange(_s => {});
       expect(fatal.calledOnce).to.be.true;
-      expectError(fatal, "Cannot read property 'push' of undefined");
+      expectError(
+        fatal,
+        "Cannot read property 'push' of undefined",
+        "Cannot read properties of undefined (reading 'push')"
+      );
       fatal.reset();
 
       rt.realtimeUnsubscribeToLocalSignalStrengthChange(_s => {});
-      expectError(fatal, "Cannot read property 'indexOf' of undefined");
+      expectError(
+        fatal,
+        "Cannot read property 'indexOf' of undefined",
+        "Cannot read properties of undefined (reading 'indexOf')"
+      );
     });
 
-    function expectError(stub: sinon.SinonStub, message: string): void {
-      const match = matchError(message);
+    function expectError(stub: sinon.SinonStub, message: string, altMessage: string = ''): void {
+      const match = matchError(message, altMessage);
       if (!stub.calledWith(match)) {
         chai.assert(false, `Expected error '${message}, but got ${stub.getCalls()[0].lastArg}`);
       }
@@ -1362,11 +1391,19 @@ describe('DefaultRealtimeController', () => {
 
       rt.realtimeSubscribeToReceiveDataMessage('a', _data => {});
       expect(fatal.calledOnce).to.be.true;
-      expectError(fatal, "Cannot read property 'has' of undefined");
+      expectError(
+        fatal,
+        "Cannot read property 'has' of undefined",
+        "Cannot read properties of undefined (reading 'has')"
+      );
       fatal.reset();
 
       rt.realtimeUnsubscribeFromReceiveDataMessage('a');
-      expectError(fatal, "Cannot read property 'delete' of undefined");
+      expectError(
+        fatal,
+        "Cannot read property 'delete' of undefined",
+        "Cannot read properties of undefined (reading 'delete')"
+      );
     });
 
     it('handles broken send datamessage callbacks', () => {
@@ -1381,11 +1418,19 @@ describe('DefaultRealtimeController', () => {
 
       rt.realtimeSubscribeToSendDataMessage((_topic, _data) => {});
       expect(fatal.calledOnce).to.be.true;
-      expectError(fatal, "Cannot read property 'push' of undefined");
+      expectError(
+        fatal,
+        "Cannot read property 'push' of undefined",
+        "Cannot read properties of undefined (reading 'push')"
+      );
       fatal.reset();
 
       rt.realtimeUnsubscribeFromSendDataMessage((_topic, _data) => {});
-      expectError(fatal, "Cannot read property 'indexOf' of undefined");
+      expectError(
+        fatal,
+        "Cannot read property 'indexOf' of undefined",
+        "Cannot read properties of undefined (reading 'indexOf')"
+      );
     });
 
     it('handles broken mute callbacks', () => {
@@ -1400,11 +1445,19 @@ describe('DefaultRealtimeController', () => {
 
       rt.realtimeSubscribeToMuteAndUnmuteLocalAudio(_m => {});
       expect(fatal.calledOnce).to.be.true;
-      expectError(fatal, "Cannot read property 'push' of undefined");
+      expectError(
+        fatal,
+        "Cannot read property 'push' of undefined",
+        "Cannot read properties of undefined (reading 'push')"
+      );
       fatal.reset();
 
       rt.realtimeUnsubscribeToMuteAndUnmuteLocalAudio(_m => {});
-      expectError(fatal, "Cannot read property 'indexOf' of undefined");
+      expectError(
+        fatal,
+        "Cannot read property 'indexOf' of undefined",
+        "Cannot read properties of undefined (reading 'indexOf')"
+      );
     });
 
     it('handles broken fatal callbacks', () => {

@@ -6,7 +6,7 @@ import AudioVideoObserver from '../audiovideoobserver/AudioVideoObserver';
 import DefaultDevicePixelRatioMonitor from '../devicepixelratiomonitor/DefaultDevicePixelRatioMonitor';
 import DevicePixelRatioWindowSource from '../devicepixelratiosource/DevicePixelRatioWindowSource';
 import Logger from '../logger/Logger';
-import Maybe from '../maybe/Maybe';
+import { Maybe } from '../utils/Types';
 import VideoTile from '../videotile/VideoTile';
 import VideoTileState from '../videotile/VideoTileState';
 import VideoTileFactory from '../videotilefactory/VideoTileFactory';
@@ -60,7 +60,7 @@ export default class DefaultVideoTileController implements VideoTileController {
   startLocalVideoTile(): number {
     const tile = this.findOrCreateLocalVideoTile();
     this.currentLocalTile.stateRef().localTileStarted = true;
-    this.audioVideoController.update();
+    this.audioVideoController.update({ needsRenegotiation: true });
     return tile.id();
   }
 
@@ -78,7 +78,7 @@ export default class DefaultVideoTileController implements VideoTileController {
       null,
       this.audioVideoController.configuration.credentials.externalUserId
     );
-    this.audioVideoController.update();
+    this.audioVideoController.update({ needsRenegotiation: true });
   }
 
   hasStartedLocalVideoTile(): boolean {
@@ -206,13 +206,17 @@ export default class DefaultVideoTileController implements VideoTileController {
   }
 
   haveVideoTileForAttendeeId(attendeeId: string): boolean {
+    return !!this.getVideoTileForAttendeeId(attendeeId);
+  }
+
+  getVideoTileForAttendeeId(attendeeId: string): VideoTile | undefined {
     for (const tile of this.getAllVideoTiles()) {
       const state = tile.state();
       if (state.boundAttendeeId === attendeeId) {
-        return true;
+        return tile;
       }
     }
-    return false;
+    return undefined;
   }
 
   captureVideoTile(tileId: number): ImageData | null {

@@ -6,6 +6,7 @@ import 'bootstrap';
 
 import {
   AsyncScheduler,
+  Attendee,
   AudioInputDevice,
   AudioProfile,
   AudioVideoFacade,
@@ -20,15 +21,19 @@ import {
   DefaultAudioVideoController,
   DefaultBrowserBehavior,
   DefaultDeviceController,
+  DefaultMeetingEventReporter,
   DefaultMeetingSession,
   DefaultModality,
   DefaultVideoTransformDevice,
   Device,
   DeviceChangeObserver,
   EventAttributes,
+  EventIngestionConfiguration,
   EventName,
+  EventReporter,
   LogLevel,
   Logger,
+  MeetingEventsClientConfiguration,
   MeetingSession,
   MeetingSessionConfiguration,
   MeetingSessionPOSTLogger,
@@ -36,11 +41,18 @@ import {
   MeetingSessionStatusCode,
   MeetingSessionVideoAvailability,
   MultiLogger,
+  NoOpEventReporter,
   NoOpVideoFrameProcessor,
   RemovableAnalyserNode,
   SimulcastLayers,
   TargetDisplaySize,
   TimeoutScheduler,
+  Transcript,
+  TranscriptEvent,
+  TranscriptionStatus,
+  TranscriptionStatusType,
+  TranscriptItemType,
+  TranscriptResult,
   Versioning,
   VideoDownlinkObserver,
   VideoFrameProcessor,
@@ -48,17 +60,22 @@ import {
   VideoPreference,
   VideoPreferences,
   VideoPriorityBasedPolicy,
+  VideoPriorityBasedPolicyConfig,
   VideoSource,
   VideoTileState,
   VoiceFocusDeviceTransformer,
+  VoiceFocusModelComplexity,
   VoiceFocusPaths,
+  VoiceFocusSpec,
   VoiceFocusTransformDevice,
   isAudioTransformDevice,
+  isDestroyable,
 } from 'amazon-chime-sdk-js';
 
 import CircularCut from './videofilter/CircularCut';
 import EmojifyVideoFrameProcessor from './videofilter/EmojifyVideoFrameProcessor';
 import SegmentationProcessor from './videofilter/SegmentationProcessor';
+import ResizeProcessor from './videofilter/ResizeProcessor';
 import {
   loadBodyPixDependency,
   platformCanSupportBodyPixWithoutDegradation,
@@ -75,7 +92,7 @@ let SHOULD_DIE_ON_FATALS = (() => {
   return fatalYes || (isLocal && !fatalNo);
 })();
 
-let DEBUG_LOG_PPS = false;
+let DEBUG_LOG_PPS = true;
 
 let fatal: (e: Error) => void;
 
@@ -88,7 +105,7 @@ declare global {
 
 class DemoTileOrganizer {
   // this is index instead of length
-  static MAX_TILES = 17;
+  static MAX_TILES = 27;
   tiles: { [id: number]: number } = {};
   tileStates: { [id: number]: boolean } = {};
   remoteTileCount = 0;
@@ -121,6 +138,137 @@ class DemoTileOrganizer {
   }
 }
 
+class DemoVideoTile extends HTMLElement {
+  public set tileIndex(tileIndex: number) {
+    // Update IDs for integration tests which need them
+    this.querySelector('.video-tile-nameplate').id = `nameplate-${tileIndex}`;
+    this.querySelector('.video-tile-video').id = `video-${tileIndex}`;
+  }
+
+  public set showConfigDropdown(shouldShow: boolean) {
+    const display: string = shouldShow ? 'block' : 'none';
+    (this.querySelector('.button-video-tile-config-drop') as HTMLElement).style.display = display;
+    (this.querySelector('.video-tile-pause') as HTMLElement).style.display = display;
+  }
+
+  public set showRemoteVideoPreferences(shouldShow: boolean) {
+    const display: string = shouldShow? 'block' : 'none';
+    (this.querySelector('.target-resolution-header') as HTMLElement).style.display = display;
+    (this.querySelector('.target-resolution-toggle') as HTMLElement).style.display = display;
+    (this.querySelector('.video-priority-header') as HTMLElement).style.display = display;
+    (this.querySelector('.video-priority-toggle') as HTMLElement).style.display = display;
+  }
+
+  show(isContent: boolean) {
+    this.classList.add('active');
+    if (isContent) {
+      this.classList.add('content');
+    }
+  }
+
+  public set featured(featured: boolean) {
+    if (featured) {
+      this.classList.add('featured');
+    } else {
+      this.classList.remove('featured');
+    }
+  }
+
+  hide() {
+    this.classList.remove('active', 'featured', 'content');
+  }
+
+  showVideoStats(
+    keyStatstoShow: { [key: string]: string },
+    metricsData: { [id: string]: {[key: string]: number} },
+    streamDirection: string,
+  ): void {
+    const streams = metricsData ? Object.keys(metricsData) : [];
+    if (streams.length === 0) {
+      return;
+    }
+
+    let statsInfo: HTMLDivElement = this.querySelector('#stats-info') as HTMLDivElement;
+    if (!statsInfo) {
+      statsInfo = document.createElement('div');
+      statsInfo.setAttribute('id', 'stats-info');
+      statsInfo.setAttribute('class', 'stats-info');
+    }
+
+    let statsInfoTable = this.querySelector('#stats-table') as HTMLTableElement;
+    if (statsInfoTable) {
+      statsInfo.removeChild(statsInfoTable);
+    }
+    statsInfoTable = document.createElement('table') as HTMLTableElement;
+    statsInfoTable.setAttribute('id', 'stats-table');
+    statsInfoTable.setAttribute('class', 'stats-table');
+    statsInfo.appendChild(statsInfoTable);
+
+    this.videoElement.insertAdjacentElement('afterend', statsInfo);
+    const header = statsInfoTable.insertRow(-1);
+    let cell = header.insertCell(-1);
+    cell.innerHTML = 'Video statistics';
+    for (let cnt = 0; cnt < streams.length; cnt++) {
+      cell = header.insertCell(-1);
+      cell.innerHTML = `${streamDirection} ${cnt + 1}`;
+    }
+
+    for (const ssrc of streams) {
+      for (const [metricName, value] of Object.entries(metricsData[ssrc])) {
+        if (keyStatstoShow[metricName]) {
+          const row = statsInfoTable.insertRow(-1);
+          row.setAttribute('id', `${metricName}`);
+          cell = row.insertCell(-1);
+          cell.innerHTML = keyStatstoShow[metricName];
+          cell = row.insertCell(-1);
+          cell.innerHTML = `${value}`;
+        }
+      }
+    }
+  };
+
+  public get videoElement(): HTMLVideoElement {
+    return this.querySelector('.video-tile-video');
+  }
+
+  public set nameplate(nameplate: string) {
+    const nameplateElement = this.querySelector('.video-tile-nameplate');
+    console.log(`setting nameplate to ${nameplate}`);
+    nameplateElement.innerHTML = nameplate;
+  }
+
+  public set attendeeId(attendeeId: string) {
+    const attendeeIdElement = this.querySelector('.video-tile-attendee-id');
+    console.log(`setting attendeeId to ${attendeeId}`);
+    attendeeIdElement.innerHTML = attendeeId;
+  }
+
+  public set pauseState(state: string) {
+    const pauseState = this.querySelector('.video-tile-pause-state') ;
+    pauseState.innerHTML = state;
+  }
+
+  public get pauseButtonElement(): HTMLButtonElement {
+    return this.querySelector('.video-tile-pause');
+  }
+
+  public get targetResolutionRadioElement(): HTMLFormElement {
+    return this.querySelector('.target-resolution-toggle');
+  }
+
+  public get videoPriorityRadioElement(): HTMLFormElement {
+    return this.querySelector('.video-priority-toggle');
+  }
+
+  connectedCallback() {
+    const template = document.getElementById('video-tile-template') as HTMLTemplateElement;
+    const node = document.importNode(template.content, true);
+    this.appendChild(node);
+    this.className = 'video-tile';
+  }
+}
+customElements.define('video-tile', DemoVideoTile);
+
 // Support a set of query parameters to allow for testing pre-release versions of
 // Amazon Voice Focus. If none of these parameters are supplied, the SDK default
 // values will be used.
@@ -142,9 +290,11 @@ const VOICE_FOCUS_SPEC = {
   paths: VOICE_FOCUS_PATHS,
 };
 
-type VideoFilterName = 'Emojify' | 'CircularCut' | 'NoOp' | 'Segmentation' | 'None';
+const MAX_VOICE_FOCUS_COMPLEXITY: VoiceFocusModelComplexity | undefined = undefined;
 
-const VIDEO_FILTERS: VideoFilterName[] = ['Emojify', 'CircularCut', 'NoOp'];
+type VideoFilterName = 'Emojify' | 'CircularCut' | 'NoOp' | 'Segmentation' | 'Resize (9/16)' | 'None';
+
+const VIDEO_FILTERS: VideoFilterName[] = ['Emojify', 'CircularCut', 'NoOp', 'Resize (9/16)'];
 
 class TestSound {
   static testAudioElement = new Audio();
@@ -214,10 +364,39 @@ const SimulcastLayerMapping = {
   [SimulcastLayers.High]: 'High',
 };
 
+const LANGUAGES_NO_WORD_SEPARATOR = new Set([
+  'ja-JP',
+  'zh-CN',
+]);
+
+// We use the same config options for multiple settings when configuring
+// video tiles, regardless of what they map to internally
+type ConfigLevel = 'low' | 'medium' | 'high';
+
+const ConfigLevelToVideoPriority: {[Key in ConfigLevel]: number} = {
+  low: 10,
+  medium: 5,
+  high: 1,
+};
+
+
+const ConfigLevelToTargetDisplaySize: {[Key in ConfigLevel]: TargetDisplaySize} = {
+  low: TargetDisplaySize.Low,
+  medium: TargetDisplaySize.Medium,
+  high: TargetDisplaySize.High,
+};
+
 interface Toggle {
   name: string;
   oncreate: (elem: HTMLElement) => void;
   action: () => void;
+}
+
+interface TranscriptSegment {
+  content: string;
+  attendee: Attendee;
+  startTimeMs: number;
+  endTimeMs: number;
 }
 
 export class DemoMeetingApp
@@ -236,6 +415,10 @@ export class DemoMeetingApp
   static readonly MAX_MEETING_HISTORY_MS: number = 5 * 60 * 1000;
   static readonly DATA_MESSAGE_TOPIC: string = 'chat';
   static readonly DATA_MESSAGE_LIFETIME_MS: number = 300_000;
+  // We reserve the last tile index for local video
+  static readonly LOCAL_VIDEO_TILE_INDEX: number = DemoTileOrganizer.MAX_TILES;
+  static readonly DEFAULT_VIDEO_TILE_PRIORITY: number = 5;
+  static readonly DEFAULT_VIDEO_TILE_TARGET_DISPLAY_SIZE: TargetDisplaySize = TargetDisplaySize.High;
 
   // Ideally we don't need to change this. Keep this configurable in case users have a super slow network.
   loadingBodyPixDependencyTimeoutMs: number = 10_000;
@@ -262,9 +445,13 @@ export class DemoMeetingApp
   roster: any = {};
   tileIndexToTileId: { [id: number]: number } = {};
   tileIdToTileIndex: { [id: number]: number } = {};
+  tileIdToAttendeeId: { [id: number]: string } = {};
   tileIndexToPauseEventListener: { [id: number]: (event: Event) => void } = {};
-  tileIndexToPinEventListener: { [id: number]: (event: Event) => void } = {};
+  tileIndexToTargetResolutionEventListener: { [id: number]: (event: Event) => void } = {};
+  tileIndexToPriorityEventListener: { [id: number]: (event: Event) => void } = {};
+  attendeeIdToVideoPreference = new Map<string, VideoPreference>();
   tileArea = document.getElementById('tile-area') as HTMLDivElement;
+  tileIndexToDemoVideoTile = new Map<number, DemoVideoTile>();
 
   cameraDeviceIds: string[] = [];
   microphoneDeviceIds: string[] = [];
@@ -276,22 +463,30 @@ export class DemoMeetingApp
     'button-speaker': true,
     'button-content-share': false,
     'button-pause-content-share': false,
+    'button-live-transcription': false,
     'button-video-stats': false,
     'button-video-filter': false,
     'button-record-self': false,
+    'button-record-cloud': false,
   };
 
   contentShareType: ContentShareType = ContentShareType.ScreenCapture;
 
   // feature flags
   enableWebAudio = false;
+  logLevel = LogLevel.INFO;
   enableUnifiedPlanForChromiumBasedBrowsers = true;
   enableSimulcast = false;
   usePriorityBasedDownlinkPolicy = false;
+  videoPriorityBasedPolicyConfig = VideoPriorityBasedPolicyConfig.Default;
+  enablePin = false;
 
   supportsVoiceFocus = false;
   enableVoiceFocus = false;
   voiceFocusIsActive = false;
+
+  enableLiveTranscription = false;
+  noWordSeparatorForTranscription = false;
 
   markdown = require('markdown-it')({ linkify: true });
   lastMessageSender: string | null = null;
@@ -308,6 +503,8 @@ export class DemoMeetingApp
   // will be updated when the Amazon Voice Focus display state changes.
   voiceFocusDisplayables: HTMLElement[] = [];
   analyserNode: RemovableAnalyserNode;
+
+  liveTranscriptionDisplayables: HTMLElement[] = [];
 
   chosenVideoTransformDevice: DefaultVideoTransformDevice;
   chosenVideoFilter: VideoFilterName = 'None';
@@ -328,6 +525,7 @@ export class DemoMeetingApp
     videoUpstreamFrameWidth: 'Frame Width',
     videoUpstreamBitrate: 'Bitrate (bps)',
     videoUpstreamPacketsSent: 'Packets Sent',
+    videoUpstreamPacketLossPercent: 'Packet Loss (%)',
     videoUpstreamFramesEncodedPerSecond: 'Frame Rate',
   };
 
@@ -338,12 +536,18 @@ export class DemoMeetingApp
     videoDownstreamFrameWidth: 'Frame Width',
     videoDownstreamBitrate: 'Bitrate (bps)',
     videoDownstreamPacketLossPercent: 'Packet Loss (%)',
+    videoDownstreamPacketsReceived: 'Packet Received',
     videoDownstreamFramesDecodedPerSecond: 'Frame Rate',
   };
 
   videoMetricReport: { [id: string]: { [id: string]: {} } } = {};
 
   removeFatalHandlers: () => void;
+
+  transcriptContainerDiv = document.getElementById('transcript-container') as HTMLDivElement;
+  partialTranscriptDiv: HTMLDivElement | undefined;
+  partialTranscriptResultTimeMap = new Map<string, number>();
+  partialTranscriptResultMap = new Map<string, TranscriptResult>();
 
   addFatalHandlers(): void {
     fatal = this.fatal.bind(this);
@@ -368,6 +572,9 @@ export class DemoMeetingApp
     }
   }
 
+  eventReporter: EventReporter | undefined = undefined;
+  enableEventReporting = false;
+
   constructor() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (global as any).app = this;
@@ -384,7 +591,7 @@ export class DemoMeetingApp
     this.initEventListeners();
     this.initParameters();
     this.setMediaRegion();
-    this.setUpVideoTileElementResizer();
+    this.setupVideoTiles();
     if (this.isRecorder() || this.isBroadcaster()) {
       AsyncScheduler.nextTick(async () => {
         this.meeting = new URL(window.location.href).searchParams.get('m');
@@ -445,7 +652,7 @@ export class DemoMeetingApp
         logger,
       });
       if (this.supportsVoiceFocus) {
-        this.voiceFocusTransformer = await this.getVoiceFocusDeviceTransformer();
+        this.voiceFocusTransformer = await this.getVoiceFocusDeviceTransformer(MAX_VOICE_FOCUS_COMPLEXITY);
         this.supportsVoiceFocus =
           this.voiceFocusTransformer && this.voiceFocusTransformer.isSupported();
         if (this.supportsVoiceFocus) {
@@ -474,25 +681,75 @@ export class DemoMeetingApp
       (document.getElementById('planB') as HTMLInputElement).disabled = true;
     }
 
+    document.getElementById('priority-downlink-policy').addEventListener('change', e => {
+      this.usePriorityBasedDownlinkPolicy = (document.getElementById('priority-downlink-policy') as HTMLInputElement).checked;
+
+      const priorityBasedDownlinkPolicyConfig = document.getElementById(
+        'priority-downlink-policy-preset'
+      ) as HTMLSelectElement;
+
+      if (this.usePriorityBasedDownlinkPolicy) {
+        priorityBasedDownlinkPolicyConfig.style.display = 'block';
+      } else {
+        priorityBasedDownlinkPolicyConfig.style.display = 'none';
+      }
+    });
+
+    const presetDropDown = document.getElementById('priority-downlink-policy-preset') as HTMLSelectElement;
+    presetDropDown.addEventListener('change', async e => {
+      switch (presetDropDown.value) {
+        case 'stable':
+          this.videoPriorityBasedPolicyConfig = VideoPriorityBasedPolicyConfig.StableNetworkPreset;
+          break;
+        case 'unstable':
+          this.videoPriorityBasedPolicyConfig = VideoPriorityBasedPolicyConfig.UnstableNetworkPreset;
+          break;
+        case 'default':
+          this.videoPriorityBasedPolicyConfig = VideoPriorityBasedPolicyConfig.Default;
+          break;
+      }
+      this.log('priority-downlink-policy-preset is changed: ' + presetDropDown.value);
+    });
+
     document.getElementById('form-authenticate').addEventListener('submit', e => {
       e.preventDefault();
       this.meeting = (document.getElementById('inputMeeting') as HTMLInputElement).value;
       this.name = (document.getElementById('inputName') as HTMLInputElement).value;
       this.region = (document.getElementById('inputRegion') as HTMLInputElement).value;
       this.enableSimulcast = (document.getElementById('simulcast') as HTMLInputElement).checked;
-      if (this.enableSimulcast) {
-        const videoInputQuality = document.getElementById(
-          'video-input-quality'
-        ) as HTMLSelectElement;
-        videoInputQuality.value = '720p';
-      }
+      this.enableEventReporting = (document.getElementById('event-reporting') as HTMLInputElement).checked;
       this.enableWebAudio = (document.getElementById('webaudio') as HTMLInputElement).checked;
       // js sdk default to enable unified plan, equivalent to "Disable Unified Plan" default unchecked
       this.enableUnifiedPlanForChromiumBasedBrowsers = !(document.getElementById(
         'planB'
       ) as HTMLInputElement).checked;
-
       this.usePriorityBasedDownlinkPolicy = (document.getElementById('priority-downlink-policy') as HTMLInputElement).checked;
+
+      const chosenLogLevel = (document.getElementById('logLevelSelect') as HTMLSelectElement).value;
+      switch (chosenLogLevel) {
+        case 'INFO':
+          this.logLevel = LogLevel.INFO;
+          break;
+        case 'DEBUG':
+          this.logLevel = LogLevel.DEBUG;
+          break;
+        case 'WARN':
+          this.logLevel = LogLevel.WARN;
+          break;
+        case 'ERROR':
+          this.logLevel = LogLevel.ERROR;
+          break;
+        default:
+          this.logLevel = LogLevel.OFF;
+          break;
+      }
+
+      if (!this.usePriorityBasedDownlinkPolicy) {
+        // Don't show priority related configuration if we don't support it
+        for (let i = 0; i <= DemoTileOrganizer.MAX_TILES; i++) {
+          this.tileIndexToDemoVideoTile.get(i).showRemoteVideoPreferences = false;
+        }
+      }
 
       AsyncScheduler.nextTick(
         async (): Promise<void> => {
@@ -532,7 +789,15 @@ export class DemoMeetingApp
 
           await this.initVoiceFocus();
           await this.populateAllDeviceLists();
-          await this.populateVideoFilterInputList();
+          await this.populateVideoFilterInputList(false);
+          await this.populateVideoFilterInputList(true);
+          if (this.enableSimulcast) {
+            const videoInputQuality = document.getElementById(
+              'video-input-quality'
+            ) as HTMLSelectElement;
+            videoInputQuality.value = '720p';
+            this.audioVideo.chooseVideoInputQuality(1280, 720, 15, 1400);
+          }
 
           this.switchToFlow('flow-devices');
           await this.openAudioInputFromSelectionAndPreview();
@@ -543,7 +808,6 @@ export class DemoMeetingApp
             );
           } catch (err) {
             fatal(err);
-            this.log('no video input device selected');
           }
           await this.openAudioOutputFromSelection();
           this.hideProgress('progress-authenticate');
@@ -633,6 +897,17 @@ export class DemoMeetingApp
       );
     });
 
+    if(!this.areVideoFiltersSupported())  {
+      document.getElementById('video-input-filter-container').style.display = 'none';
+    }
+
+    let videoInputFilter = document.getElementById('video-input-filter') as HTMLInputElement;
+    videoInputFilter.addEventListener('change', async () => {
+      this.selectedVideoFilterItem = <VideoFilterName>videoInputFilter.value;
+      this.log(`Clicking video filter: ${this.selectedVideoFilterItem}`);
+      await this.openVideoInputFromSelection(this.selectedVideoInput, true)
+    });
+
     document.getElementById('copy-sip-uri').addEventListener('click', () => {
       const sipUriElement = document.getElementById('sip-uri') as HTMLInputElement;
       sipUriElement.select();
@@ -652,7 +927,6 @@ export class DemoMeetingApp
         await this.openVideoInputFromSelection(videoInput.value, true);
       } catch (err) {
         fatal(err);
-        this.log('no video input device selected');
       }
     });
 
@@ -674,7 +948,6 @@ export class DemoMeetingApp
         await this.openVideoInputFromSelection(videoInput.value, true);
       } catch (err) {
         fatal(err);
-        this.log('no video input device selected');
       }
     });
 
@@ -700,8 +973,10 @@ export class DemoMeetingApp
           this.audioVideo.stopVideoPreviewForVideoInput(
             document.getElementById('video-preview') as HTMLVideoElement
           );
+          // stopVideoProcessor should be called before join; it ensures that state variables and video processor stream are cleaned / removed before joining the meeting.
+          // If stopVideoProcessor is not called then the state from preview screen will be carried into the in meeting experience and it will cause undesired side effects.
+          await this.stopVideoProcessor();
           await this.join();
-          this.audioVideo.chooseVideoInputDevice(null);
           this.hideProgress('progress-join');
           this.displayButtonStates();
           this.switchToFlow('flow-meeting');
@@ -726,11 +1001,28 @@ export class DemoMeetingApp
     );
 
     const buttonMute = document.getElementById('button-microphone');
-    buttonMute.addEventListener('mousedown', _e => {
+    buttonMute.addEventListener('click', _e => {
       if (this.toggleButton('button-microphone')) {
         this.audioVideo.realtimeUnmuteLocalAudio();
       } else {
         this.audioVideo.realtimeMuteLocalAudio();
+      }
+    });
+
+    const buttonCloudCapture = document.getElementById('button-record-cloud') as HTMLButtonElement;
+    buttonCloudCapture.addEventListener('click', _e => {
+      if (this.toggleButton('button-record-cloud')) {
+        AsyncScheduler.nextTick(async () => {
+          buttonCloudCapture.disabled = true;
+          await this.startMediaCapture();
+          buttonCloudCapture.disabled = false;
+        });
+      } else {
+        AsyncScheduler.nextTick(async () => {
+          buttonCloudCapture.disabled = true;
+          await this.stopMediaCapture();
+          buttonCloudCapture.disabled = false;
+        });
       }
     });
 
@@ -802,11 +1094,10 @@ export class DemoMeetingApp
             this.audioVideo.startLocalVideoTile();
           } catch (err) {
             fatal(err);
-            this.log('no video input device selected');
           }
         } else {
           this.audioVideo.stopLocalVideoTile();
-          this.hideTile(DemoTileOrganizer.MAX_TILES);
+          this.tileIndexToDemoVideoTile.get(DemoMeetingApp.LOCAL_VIDEO_TILE_INDEX).hide();
         }
       });
     });
@@ -861,6 +1152,59 @@ export class DemoMeetingApp
         }
       });
     });
+
+    const buttonLiveTranscription = document.getElementById('button-live-transcription');
+    buttonLiveTranscription.addEventListener('click', () => {
+      this.transcriptContainerDiv.style.display = this.isButtonOn('button-live-transcription') ? 'none' : 'block';
+      this.toggleButton('button-live-transcription');
+    });
+
+    const buttonLiveTranscriptionModal = document.getElementById('button-live-transcription-modal-close');
+    buttonLiveTranscriptionModal.addEventListener('click', () => {
+      document.getElementById('live-transcription-modal').style.display = 'none';
+    });
+
+    // show only languages available to selected transcription engine
+    document.getElementsByName('transcription-engine').forEach(e => {
+      e.addEventListener('change', () => {
+        const engineTranscribeChecked = (document.getElementById('engine-transcribe') as HTMLInputElement).checked;
+        document.getElementById('engine-transcribe-language').classList.toggle('hidden', !engineTranscribeChecked);
+		    document.getElementById('engine-transcribe-medical-language').classList.toggle('hidden', engineTranscribeChecked);
+        document.getElementById('engine-transcribe-region').classList.toggle('hidden', !engineTranscribeChecked);
+        document.getElementById('engine-transcribe-medical-region').classList.toggle('hidden', engineTranscribeChecked);
+      });
+    });
+
+    const buttonStartTranscription = document.getElementById('button-start-transcription');
+    buttonStartTranscription.addEventListener('click', async () => {
+      let engine = '';
+      let languageCode = '';
+      let region = '';
+      if ((document.getElementById('engine-transcribe') as HTMLInputElement).checked) {
+        engine = 'transcribe';
+        languageCode = (document.getElementById('transcribe-language') as HTMLInputElement).value;
+        region = (document.getElementById('transcribe-region') as HTMLInputElement).value;
+      } else if ((document.getElementById('engine-transcribe-medical') as HTMLInputElement).checked) {
+        engine = 'transcribe_medical';
+        languageCode = (document.getElementById('transcribe-medical-language') as HTMLInputElement).value;
+        region = (document.getElementById('transcribe-medical-region') as HTMLInputElement).value;
+      } else {
+        throw new Error('Unknown transcription engine');
+      }
+      await startLiveTranscription(engine, languageCode, region);
+    });
+
+    const startLiveTranscription = async (engine: string, languageCode: string, region: string) => {
+      const response = await fetch(`${DemoMeetingApp.BASE_URL}start_transcription?title=${encodeURIComponent(this.meeting)}&engine=${encodeURIComponent(engine)}&language=${encodeURIComponent(languageCode)}&region=${encodeURIComponent(region)}`, {
+        method: 'POST',
+      });
+      const json = await response.json();
+      if (json.error) {
+        throw new Error(`Server error: ${json.error}`);
+      }
+
+      document.getElementById('live-transcription-modal').style.display = 'none';
+    };
 
     const buttonVideoStats = document.getElementById('button-video-stats');
     buttonVideoStats.addEventListener('click', () => {
@@ -965,7 +1309,15 @@ export class DemoMeetingApp
           const now = Date.now();
           const deltat = now - start;
           const deltap = entry.packetsSent - packets;
-          console.info('PPS:', (1000 * deltap) / deltat);
+          const pps = (1000 * deltap) / deltat;
+
+          let overage = 0;
+          if ((pps > 52) || (pps < 47)) {
+            console.error('PPS:', pps, `(${++overage})`);
+          } else {
+            overage = 0;
+            console.debug('PPS:', pps);
+          }
           start = now;
           packets = entry.packetsSent;
           return;
@@ -1020,7 +1372,11 @@ export class DemoMeetingApp
     );
   }
 
-  
+  setButtonVisibility(button: string, visible: boolean, state?: 'on' | 'off') {
+    const element = document.getElementById(button);
+    element.style.display = visible ? 'inline-block' : 'none';
+    this.toggleButton(button, state);
+  }
 
   toggleButton(button: string, state?: 'on' | 'off'): boolean {
     if (state === 'on') {
@@ -1096,6 +1452,10 @@ export class DemoMeetingApp
       // Select a new device.
       await this.openAudioInputFromSelectionAndPreview();
     }
+  }
+
+  audioInputMuteStateChanged(device: string | MediaStream, muted: boolean): void {
+    this.log('Mute state: device', device, muted ? 'is muted' : 'is not muted');
   }
 
   audioInputsChanged(freshAudioInputDeviceList: MediaDeviceInfo[]): void {
@@ -1195,72 +1555,14 @@ export class DemoMeetingApp
       }
       const tileId = videoTile.id();
       const tileIndex = this.tileIdToTileIndex[tileId];
+      const demoVideoTile = this.tileIndexToDemoVideoTile.get(tileIndex);
       if (tileState.localTile) {
-        this.showVideoStats(tileIndex, this.videoUpstreamMetricsKeyStats, videoMetricReport[tileState.boundAttendeeId], 'Upstream');
+        demoVideoTile.showVideoStats(this.videoUpstreamMetricsKeyStats, videoMetricReport[tileState.boundAttendeeId], 'Upstream');
       } else {
-        this.showVideoStats(tileIndex, this.videoDownstreamMetricsKeyStats, videoMetricReport[tileState.boundAttendeeId], 'Downstream');
+        demoVideoTile.showVideoStats(this.videoDownstreamMetricsKeyStats, videoMetricReport[tileState.boundAttendeeId], 'Downstream');
       }
     }
   }
-
-  showVideoStats = (
-    tileIndex: number,
-    keyStatstoShow: { [key: string]: string },
-    metricsData: { [id: string]: {[key: string]: number} },
-    streamDirection: string,
-  ): void => {
-    const streams = metricsData ? Object.keys(metricsData) : [];
-    if (streams.length === 0) {
-      return;
-    }
-
-    let statsInfo: HTMLDivElement = document.getElementById(
-      `stats-info-${tileIndex}`
-    ) as HTMLDivElement;
-    if (!statsInfo) {
-      statsInfo = document.createElement('div');
-      statsInfo.setAttribute('id', `stats-info-${tileIndex}`);
-      statsInfo.setAttribute('class', `stats-info`);
-    }
-
-    const statsInfoTableId = `stats-table-${tileIndex}`;
-    let statsInfoTable = document.getElementById(statsInfoTableId) as HTMLTableElement;
-    if (statsInfoTable) {
-      statsInfo.removeChild(statsInfoTable);
-    }
-    statsInfoTable = document.createElement('table') as HTMLTableElement;
-    statsInfoTable.setAttribute('id', statsInfoTableId);
-    statsInfoTable.setAttribute('class', 'stats-table');
-    statsInfo.appendChild(statsInfoTable);
-
-    const videoEl = document.getElementById(`video-${tileIndex}`) as HTMLVideoElement;
-    videoEl.insertAdjacentElement('afterend', statsInfo);
-    const header = statsInfoTable.insertRow(-1);
-    let cell = header.insertCell(-1);
-    cell.innerHTML = 'Video statistics';
-    for (let cnt = 0; cnt < streams.length; cnt++) {
-      cell = header.insertCell(-1);
-      cell.innerHTML = `${streamDirection} ${cnt + 1}`;
-    }
-
-    for (const ssrc of streams) {
-      for (const [metricName, value] of Object.entries(metricsData[ssrc])) {
-        if (keyStatstoShow[metricName]) {
-          const rowElement = document.getElementById(
-            `${metricName}-${tileIndex}`
-          ) as HTMLTableRowElement;
-          const row = rowElement ? rowElement : statsInfoTable.insertRow(-1);
-          if (!rowElement) {
-            row.setAttribute('id', `${metricName}-${tileIndex}`);
-            cell = row.insertCell(-1);
-            cell.innerHTML = keyStatstoShow[metricName];
-          }
-            cell = row.insertCell(-1);
-            cell.innerHTML = `${value}`;
-        }
-      }
-    }
-  };
 
   resetStats = (): void => {
     this.videoMetricReport = {};
@@ -1318,8 +1620,11 @@ export class DemoMeetingApp
       case 'videoInputSelected':
       case 'audioInputUnselected':
       case 'videoInputUnselected':
+      case 'meetingReconnected':
+      case 'receivingAudioDropped':
+      case 'signalingDropped':
       case 'attendeePresenceReceived': {
-        // Exclude the "meetingHistory" attribute for successful events.
+        // Exclude the "meetingHistory" attribute for successful -> published events.
         this.meetingEventPOSTLogger?.info(
           JSON.stringify({
             name,
@@ -1350,23 +1655,21 @@ export class DemoMeetingApp
   }
 
   async initializeMeetingSession(configuration: MeetingSessionConfiguration): Promise<void> {
-    const logLevel = LogLevel.INFO;
-    const consoleLogger = (this.meetingLogger = new ConsoleLogger('SDK', logLevel));
-    if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+    const consoleLogger = (this.meetingLogger = new ConsoleLogger('SDK', this.logLevel));
+    if (this.isLocalHost()) {
       this.meetingLogger = consoleLogger;
     } else {
       await Promise.all([
         this.createLogStream(configuration, 'create_log_stream'),
         this.createLogStream(configuration, 'create_browser_event_log_stream'),
       ]);
-
       this.meetingSessionPOSTLogger = new MeetingSessionPOSTLogger(
         'SDK',
         configuration,
         DemoMeetingApp.LOGGER_BATCH_SIZE,
         DemoMeetingApp.LOGGER_INTERVAL_MS,
         `${DemoMeetingApp.BASE_URL}logs`,
-        logLevel
+        this.logLevel
       );
       this.meetingLogger = new MultiLogger(
         consoleLogger,
@@ -1378,9 +1681,10 @@ export class DemoMeetingApp
         DemoMeetingApp.LOGGER_BATCH_SIZE,
         DemoMeetingApp.LOGGER_INTERVAL_MS,
         `${DemoMeetingApp.BASE_URL}log_meeting_event`,
-        logLevel
+        this.logLevel
       );
     }
+    this.eventReporter = await this.setupEventReporter(configuration);
     const deviceController = new DefaultDeviceController(this.meetingLogger, {
       enableWebAudio: this.enableWebAudio,
     });
@@ -1392,7 +1696,7 @@ export class DemoMeetingApp
     }
     configuration.enableSimulcastForUnifiedPlanChromiumBasedBrowsers = this.enableSimulcast;
     if (this.usePriorityBasedDownlinkPolicy) {
-      this.priorityBasedDownlinkPolicy = new VideoPriorityBasedPolicy(this.meetingLogger);
+      this.priorityBasedDownlinkPolicy = new VideoPriorityBasedPolicy(this.meetingLogger, this.videoPriorityBasedPolicyConfig);
       configuration.videoDownlinkBandwidthPolicy = this.priorityBasedDownlinkPolicy;
       this.priorityBasedDownlinkPolicy.addObserver(this);
     }
@@ -1400,7 +1704,8 @@ export class DemoMeetingApp
     this.meetingSession = new DefaultMeetingSession(
       configuration,
       this.meetingLogger,
-      deviceController
+      deviceController,
+      this.eventReporter
     );
 
     if ((document.getElementById('fullband-speech-mono-quality') as HTMLInputElement).checked) {
@@ -1413,18 +1718,60 @@ export class DemoMeetingApp
       this.meetingSession.audioVideo.setContentAudioProfile(AudioProfile.fullbandMusicMono());
     }
     this.audioVideo = this.meetingSession.audioVideo;
-    if (this.enableSimulcast) {
-      this.audioVideo.chooseVideoInputQuality(1280, 720, 15, 1400);
-    }
     this.audioVideo.addDeviceChangeObserver(this);
     this.setupDeviceLabelTrigger();
     this.setupMuteHandler();
     this.setupCanUnmuteHandler();
     this.setupSubscribeToAttendeeIdPresenceHandler();
     this.setupDataMessage();
+    this.setupLiveTranscription();
     this.audioVideo.addObserver(this);
     this.audioVideo.addContentShareObserver(this);
     this.initContentShareDropDownItems();
+  }
+
+  async setupEventReporter(configuration: MeetingSessionConfiguration): Promise<EventReporter> {
+    let eventReporter: EventReporter;
+    const ingestionURL = configuration.urls.eventIngestionURL;
+    if (!ingestionURL) {
+      return eventReporter;
+    }
+    if (!this.enableEventReporting) {
+      return new NoOpEventReporter();
+    }
+    const eventReportingLogger = new ConsoleLogger('SDKEventIngestion', LogLevel.INFO);
+    const meetingEventClientConfig = new MeetingEventsClientConfiguration(
+      configuration.meetingId,
+      configuration.credentials.attendeeId,
+      configuration.credentials.joinToken
+    );
+    const eventIngestionConfiguration = new EventIngestionConfiguration(
+      meetingEventClientConfig,
+      ingestionURL
+    );
+    if (this.isLocalHost()) {
+      eventReporter = new DefaultMeetingEventReporter(eventIngestionConfiguration, eventReportingLogger);
+    } else {
+      await this.createLogStream(configuration, 'create_browser_event_ingestion_log_stream');
+      const eventReportingPOSTLogger = new MeetingSessionPOSTLogger(
+        'SDKEventIngestion',
+        configuration,
+        DemoMeetingApp.LOGGER_BATCH_SIZE,
+        DemoMeetingApp.LOGGER_INTERVAL_MS,
+        `${DemoMeetingApp.BASE_URL}log_event_ingestion`,
+        LogLevel.DEBUG
+      );
+      const multiEventReportingLogger = new MultiLogger(
+        eventReportingLogger,
+        eventReportingPOSTLogger,
+      );
+      eventReporter = new DefaultMeetingEventReporter(eventIngestionConfiguration, multiEventReportingLogger);
+    }
+    return eventReporter;
+  }
+
+  private isLocalHost(): boolean {
+    return document.location.host === '127.0.0.1:8080' || document.location.host === 'localhost:8080';
   }
 
   async join(): Promise<void> {
@@ -1602,49 +1949,6 @@ export class DemoMeetingApp
     );
   }
 
-  async getStatsForOutbound(id: string): Promise<void> {
-    const videoElement = document.getElementById(id) as HTMLVideoElement;
-    const stream = videoElement.srcObject as MediaStream;
-    const track = stream.getVideoTracks()[0];
-    const basicReports: { [id: string]: number } = {};
-
-    const reports = await this.audioVideo.getRTCPeerConnectionStats(track);
-    let duration: number;
-
-    reports.forEach(report => {
-      if (report.type === 'outbound-rtp') {
-        // remained to be calculated
-        this.log(`${id} is bound to ssrc ${report.ssrc}`);
-        basicReports['bitrate'] = report.bytesSent;
-        basicReports['width'] = report.frameWidth;
-        basicReports['height'] = report.frameHeight;
-        basicReports['fps'] = report.framesEncoded;
-        duration = report.timestamp;
-      }
-    });
-
-    await new TimeoutScheduler(1000).start(() => {
-      this.audioVideo.getRTCPeerConnectionStats(track).then(reports => {
-        reports.forEach(report => {
-          if (report.type === 'outbound-rtp') {
-            duration = report.timestamp - duration;
-            duration = duration / 1000;
-            // remained to be calculated
-            basicReports['bitrate'] = Math.trunc(
-              ((report.bytesSent - basicReports['bitrate']) * 8) / duration
-            );
-            basicReports['width'] = report.frameWidth;
-            basicReports['height'] = report.frameHeight;
-            basicReports['fps'] = Math.trunc(
-              (report.framesEncoded - basicReports['fps']) / duration
-            );
-            this.log(JSON.stringify(basicReports));
-          }
-        });
-      });
-    });
-  }
-
   dataMessageHandler(dataMessage: DataMessage): void {
     if (!dataMessage.throttled) {
       const isSelf =
@@ -1690,6 +1994,196 @@ export class DemoMeetingApp
     );
   }
 
+  transcriptEventHandler = (transcriptEvent: TranscriptEvent): void => {
+    if (!this.enableLiveTranscription) {
+      // Toggle disabled 'Live Transcription' button to enabled when we receive any transcript event
+      this.enableLiveTranscription = true;
+      this.updateLiveTranscriptionDisplayState();
+
+      // Transcripts view and the button to show and hide it are initially hidden
+      // Show them when when live transcription gets enabled, and do not hide afterwards
+      this.setButtonVisibility('button-live-transcription', true, 'on');
+      this.transcriptContainerDiv.style.display = 'block';
+    }
+
+    if (transcriptEvent instanceof TranscriptionStatus) {
+      this.appendStatusDiv(transcriptEvent);
+      if (transcriptEvent.type === TranscriptionStatusType.STARTED) {
+        // Determine word separator based on language code
+        let languageCode = null;
+        const transcriptionConfiguration = JSON.parse(transcriptEvent.transcriptionConfiguration);
+        if (transcriptionConfiguration) {
+          if (transcriptionConfiguration.EngineTranscribeSettings) {
+            languageCode = transcriptionConfiguration.EngineTranscribeSettings.LanguageCode;
+          } else if (transcriptionConfiguration.EngineTranscribeMedicalSettings) {
+            languageCode = transcriptionConfiguration.EngineTranscribeMedicalSettings.languageCode;
+          }
+        }
+
+        if (languageCode && LANGUAGES_NO_WORD_SEPARATOR.has(languageCode)) {
+          this.noWordSeparatorForTranscription = true;
+        }
+      } else if (transcriptEvent.type === TranscriptionStatusType.STOPPED && this.enableLiveTranscription) {
+        // When we receive a STOPPED status event:
+        // 1. toggle enabled 'Live Transcription' button to disabled
+        this.enableLiveTranscription = false;
+        this.noWordSeparatorForTranscription = false;
+        this.updateLiveTranscriptionDisplayState();
+
+        // 2. force finalize all partial results
+        this.partialTranscriptResultTimeMap.clear();
+        this.partialTranscriptDiv = null;
+        this.partialTranscriptResultMap.clear();
+      }
+    } else if (transcriptEvent instanceof Transcript) {
+      for (const result of transcriptEvent.results) {
+        const resultId = result.resultId;
+        const isPartial = result.isPartial;
+
+        this.partialTranscriptResultMap.set(resultId, result);
+        this.partialTranscriptResultTimeMap.set(resultId, result.endTimeMs);
+        this.renderPartialTranscriptResults();
+        if (isPartial) {
+          continue;
+        }
+
+        // Force finalizing partial results that's 5 seconds older than the latest one,
+        // to prevent local partial results from indefinitely growing
+        for (const [olderResultId, endTimeMs] of this.partialTranscriptResultTimeMap) {
+          if (olderResultId === resultId) {
+            break;
+          } else if (endTimeMs < result.endTimeMs - 5000) {
+            this.partialTranscriptResultTimeMap.delete(olderResultId);
+          }
+        }
+
+        this.partialTranscriptResultTimeMap.delete(resultId);
+
+        if (this.partialTranscriptResultTimeMap.size === 0) {
+          // No more partial results in current batch, reset current batch
+          this.partialTranscriptDiv = null;
+          this.partialTranscriptResultMap.clear();
+        }
+      }
+    }
+
+    this.transcriptContainerDiv.scrollTop = this.transcriptContainerDiv.scrollHeight;
+  };
+
+  renderPartialTranscriptResults = () => {
+    if (this.partialTranscriptDiv) {
+      // Keep updating existing partial result div
+      this.updatePartialTranscriptDiv();
+    } else {
+      // All previous results were finalized. Create a new div for new results, update, then add it to DOM
+      this.partialTranscriptDiv = document.createElement('div') as HTMLDivElement;
+      this.updatePartialTranscriptDiv();
+      this.transcriptContainerDiv.appendChild(this.partialTranscriptDiv);
+    }
+  };
+
+  updatePartialTranscriptDiv = () => {
+    this.partialTranscriptDiv.innerHTML = '';
+
+    const partialTranscriptSegments: TranscriptSegment[] = [];
+    for (const result of this.partialTranscriptResultMap.values()) {
+      this.populatePartialTranscriptSegmentsFromResult(partialTranscriptSegments, result);
+    }
+    partialTranscriptSegments.sort((a, b) => a.startTimeMs - b.startTimeMs);
+
+    const speakerToTranscriptSpanMap = new Map<string, HTMLSpanElement>();
+    for (const segment of partialTranscriptSegments) {
+      const newSpeakerId = segment.attendee.attendeeId;
+      if (!speakerToTranscriptSpanMap.has(newSpeakerId)) {
+        this.appendNewSpeakerTranscriptDiv(segment, speakerToTranscriptSpanMap);
+      } else {
+        const partialResultSpeakers: string[] = Array.from(speakerToTranscriptSpanMap.keys());
+        if (partialResultSpeakers.indexOf(newSpeakerId) < partialResultSpeakers.length - 1) {
+          // Not the latest speaker and we reach the end of a sentence, clear the speaker to Span mapping to break line
+          speakerToTranscriptSpanMap.delete(newSpeakerId);
+          this.appendNewSpeakerTranscriptDiv(segment, speakerToTranscriptSpanMap);
+        } else {
+          const transcriptSpan = speakerToTranscriptSpanMap.get(newSpeakerId);
+          transcriptSpan.innerText = transcriptSpan.innerText + '\u00a0' + segment.content;
+        }
+      }
+    }
+  };
+
+  populatePartialTranscriptSegmentsFromResult = (segments: TranscriptSegment[], result: TranscriptResult) => {
+    let startTimeMs: number = null;
+    let content = '';
+    let attendee: Attendee = null;
+    for (const item of result.alternatives[0].items) {
+      if (!startTimeMs) {
+        content = item.content;
+        attendee = item.attendee;
+        startTimeMs = item.startTimeMs;
+      } else if (item.type === TranscriptItemType.PUNCTUATION) {
+        content = content + item.content;
+        segments.push({
+          content: content,
+          attendee: attendee,
+          startTimeMs: startTimeMs,
+          endTimeMs: item.endTimeMs
+        });
+        content = '';
+        startTimeMs = null;
+        attendee = null;
+      } else {
+        if (this.noWordSeparatorForTranscription) {
+          content = content + item.content;
+        } else {
+          content = content + ' ' + item.content;
+        }
+      }
+    }
+
+    // Reached end of the result but there is no closing punctuation
+    if (startTimeMs) {
+      segments.push({
+        content: content,
+        attendee: attendee,
+        startTimeMs: startTimeMs,
+        endTimeMs: result.endTimeMs,
+      });
+    }
+  };
+
+  appendNewSpeakerTranscriptDiv = (
+    segment: TranscriptSegment,
+    speakerToTranscriptSpanMap: Map<string, HTMLSpanElement>) =>
+  {
+    const speakerTranscriptDiv = document.createElement('div') as HTMLDivElement;
+    speakerTranscriptDiv.classList.add('transcript');
+
+    const speakerSpan = document.createElement('span') as HTMLSpanElement;
+    speakerSpan.classList.add('transcript-speaker');
+    speakerSpan.innerText = segment.attendee.externalUserId.split('#').slice(-1)[0] + ': ';
+    speakerTranscriptDiv.appendChild(speakerSpan);
+
+    const transcriptSpan = document.createElement('span') as HTMLSpanElement;
+    transcriptSpan.classList.add('transcript-content');
+    transcriptSpan.innerText = segment.content;
+    speakerTranscriptDiv.appendChild(transcriptSpan);
+
+    this.partialTranscriptDiv.appendChild(speakerTranscriptDiv);
+
+    speakerToTranscriptSpanMap.set(segment.attendee.attendeeId, transcriptSpan);
+  };
+
+  appendStatusDiv = (status: TranscriptionStatus) => {
+    const statusDiv = document.createElement('div') as HTMLDivElement;
+    statusDiv.innerText = '(Live Transcription ' + status.type + ' at '
+      + new Date(status.eventTimeMs).toLocaleTimeString() + ' in ' + status.transcriptionRegion
+      + ' with configuration: ' + status.transcriptionConfiguration + ')';
+    this.transcriptContainerDiv.appendChild(statusDiv);
+  };
+
+  setupLiveTranscription = () => {
+    this.audioVideo.transcriptionController?.subscribeToTranscriptEvent(this.transcriptEventHandler);
+  };
+
   // eslint-disable-next-line
   async joinMeeting(): Promise<any> {
     const response = await fetch(
@@ -1706,6 +2200,21 @@ export class DemoMeetingApp
     }
     return json;
   }
+
+  async startMediaCapture(): Promise<any> {
+    await fetch(
+      `${DemoMeetingApp.BASE_URL}startCapture?title=${encodeURIComponent(this.meeting)}`, {
+        method: 'POST',
+      });
+  }
+
+  async stopMediaCapture(): Promise<any> {
+    await fetch(
+      `${DemoMeetingApp.BASE_URL}endCapture?title=${encodeURIComponent(this.meeting)}`, {
+        method: 'POST',
+      });
+  }
+
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async endMeeting(): Promise<any> {
@@ -1743,17 +2252,20 @@ export class DemoMeetingApp
     // Also note that Firefox has its own device picker, which may be useful
     // for the first device selection. Subsequent device selections could use
     // a custom UX with a specific device id.
-    this.audioVideo.setDeviceLabelTrigger(
-      async (): Promise<MediaStream> => {
-        if (this.isRecorder() || this.isBroadcaster()) {
-          throw new Error('Recorder or Broadcaster does not need device labels');
+    if(!this.defaultBrowserBehaviour.doesNotSupportMediaDeviceLabels())
+    {
+      this.audioVideo.setDeviceLabelTrigger(
+        async (): Promise<MediaStream> => {
+          if (this.isRecorder() || this.isBroadcaster()) {
+            throw new Error('Recorder or Broadcaster does not need device labels');
+          }
+          this.switchToFlow('flow-need-permission');
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+          this.switchToFlow('flow-devices');
+          return stream;
         }
-        this.switchToFlow('flow-need-permission');
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
-        this.switchToFlow('flow-devices');
-        return stream;
-      }
     );
+    }
   }
 
   populateDeviceList(
@@ -1787,6 +2299,29 @@ export class DemoMeetingApp
     if (!list.firstElementChild) {
       const option = document.createElement('option');
       option.text = 'Device selection unavailable';
+      list.appendChild(option);
+    }
+  }
+
+  populateVideoPreviewFilterList(
+    elementId: string,
+    genericName: string,
+    filters: VideoFilterName[]
+  ): void {
+    const list = document.getElementById(elementId) as HTMLSelectElement;
+    while (list.firstElementChild) {
+      list.removeChild(list.firstElementChild);
+    }
+    for (let i = 0; i < filters.length; i++) {
+      const option = document.createElement('option');
+      list.appendChild(option);
+      option.text = filters[i] || `${genericName} ${i + 1}`;
+      option.value = filters[i];
+    }
+
+    if (!list.firstElementChild) {
+      const option = document.createElement('option');
+      option.text = 'Filter selection unavailable';
       list.appendChild(option);
     }
   }
@@ -1874,14 +2409,18 @@ export class DemoMeetingApp
     }
   }
 
-  private async populateVideoFilterInputList(): Promise<void> {
+  private async stopVideoProcessor(): Promise<void>  {
+    this.log('Clearing filter variables and stopping the video transform device');
+    this.chosenVideoFilter = 'None';
+    this.selectedVideoFilterItem = 'None';
+    this.chosenVideoTransformDevice?.stop();
+  }
+
+  private async populateVideoFilterInputList(isPreviewWindow: boolean): Promise<void> {
     const genericName = 'Filter';
     let filters: VideoFilterName[] = ['None'];
 
-    if (
-      this.defaultBrowserBehaviour.supportsCanvasCapturedStreamPlayback() &&
-      this.enableUnifiedPlanForChromiumBasedBrowsers
-    ) {
+    if (this.areVideoFiltersSupported()) {
       filters = filters.concat(VIDEO_FILTERS);
       if (platformCanSupportBodyPixWithoutDegradation()) {
         if (!this.loadingBodyPixDependencyPromise) {
@@ -1890,37 +2429,41 @@ export class DemoMeetingApp
         // do not use `await` to avoid blocking page loading
         this.loadingBodyPixDependencyPromise.then(() => {
           filters.push('Segmentation');
-          this.populateInMeetingDeviceList(
-            'dropdown-menu-filter',
-            genericName,
-            [],
-            filters,
-            undefined,
-            async (name: VideoFilterName) => {
-              await this.selectVideoFilterByName(name);
-            }
-          );
+          this.populateFilterList(isPreviewWindow, genericName, filters);
         }).catch(err => {
           this.log('Could not load BodyPix dependency', err);
         });
       }
     }
 
-    this.populateInMeetingDeviceList(
-      'dropdown-menu-filter',
-      genericName,
-      [],
-      filters,
-      undefined,
-      async (name: VideoFilterName) => {
-        await this.selectVideoFilterByName(name);
-      }
-    );
+    this.populateFilterList(isPreviewWindow, genericName, filters);
+  }
+
+  private async populateFilterList(isPreviewWindow: boolean, genericName: string, filters: VideoFilterName[]): Promise<void> {
+    if(isPreviewWindow) {
+      this.populateVideoPreviewFilterList(
+        'video-input-filter',
+        genericName,
+        filters
+      );
+    }
+    else  {
+      this.populateInMeetingDeviceList(
+        'dropdown-menu-filter',
+        genericName,
+        [],
+        filters,
+        undefined,
+        async (name: VideoFilterName) => {
+          await this.selectVideoFilterByName(name);
+        }
+      );
+    }
   }
 
   async populateAudioInputList(): Promise<void> {
     const genericName = 'Microphone';
-    const additionalDevices = ['None', '440 Hz'];
+    const additionalDevices = ['None', '440 Hz', 'Prerecorded Speech'];
     const additionalToggles = [];
 
     // This can't work unless Web Audio is enabled.
@@ -1933,6 +2476,14 @@ export class DemoMeetingApp
         action: () => this.toggleVoiceFocusInMeeting(),
       });
     }
+
+    additionalToggles.push({
+      name: 'Live Transcription',
+      oncreate: (elem: HTMLElement) => {
+        this.liveTranscriptionDisplayables.push(elem);
+      },
+      action: () => this.toggleLiveTranscription(),
+    });
 
     this.populateDeviceList(
       'audio-input',
@@ -1951,6 +2502,10 @@ export class DemoMeetingApp
         await this.selectAudioInputDeviceByName(name);
       }
     );
+  }
+
+  private areVideoFiltersSupported(): boolean {
+    return this.defaultBrowserBehaviour.supportsCanvasCapturedStreamPlayback() && this.enableUnifiedPlanForChromiumBasedBrowsers;
   }
 
   private isVoiceFocusActive(): boolean {
@@ -2000,6 +2555,30 @@ export class DemoMeetingApp
     await this.reselectAudioInputDevice();
   }
 
+  private updateLiveTranscriptionDisplayState() {
+    this.log('Updating live transcription display state to:', this.enableLiveTranscription);
+    for (const elem of this.liveTranscriptionDisplayables) {
+      elem.classList.toggle('live-transcription-active', this.enableLiveTranscription);
+    }
+  }
+
+  private async toggleLiveTranscription(): Promise<void> {
+    this.log('live transcription were previously set to ' + this.enableLiveTranscription + '; attempting to toggle');
+
+    if (this.enableLiveTranscription) {
+      const response = await fetch(`${DemoMeetingApp.BASE_URL}${encodeURIComponent('stop_transcription')}?title=${encodeURIComponent(this.meeting)}`, {
+        method: 'POST',
+      });
+      const json = await response.json();
+      if (json.error) {
+        throw new Error(`Server error: ${json.error}`);
+      }
+    } else {
+      const liveTranscriptionModal = document.getElementById(`live-transcription-modal`);
+      liveTranscriptionModal.style.display = "block";
+    }
+  }
+
   async populateVideoInputList(): Promise<void> {
     const genericName = 'Camera';
     const additionalDevices = ['None', 'Blue', 'SMPTE Color Bars'];
@@ -2020,7 +2599,6 @@ export class DemoMeetingApp
           await this.openVideoInputFromSelection(name, false);
         } catch (err) {
           fatal(err);
-          this.log('no video input device selected');
         }
       }
     );
@@ -2218,7 +2796,7 @@ export class DemoMeetingApp
         fatal(e);
         this.log(`failed to chooseVideoInputDevice ${device}`, e);
       }
-      throw new Error('no video device selected');
+      this.log('no video device selected');
     }
     try {
       await this.audioVideo.chooseVideoInputDevice(device);
@@ -2243,6 +2821,28 @@ export class DemoMeetingApp
       return DefaultDeviceController.synthesizeAudioDevice(440);
     }
 
+    if (value == 'Prerecorded Speech') {
+      const audioPath = 'audio_file';
+      try {
+        const resp = await fetch(audioPath);
+        const bytes = await resp.arrayBuffer();
+        const audioData = new TextDecoder('utf8').decode(bytes);
+        const audio = new Audio('data:audio/mpeg;base64,' + audioData);
+        audio.loop = false;
+        audio.crossOrigin = 'anonymous';
+        audio.play();
+        // @ts-ignore
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const streamDestination = audioContext.createMediaStreamDestination();
+        const mediaElementSource = audioContext.createMediaElementSource(audio);
+        mediaElementSource.connect(streamDestination);
+        return streamDestination.stream;
+      } catch (e) {
+        this.log(`Error fetching audio from ${audioPath}: ${e}`);
+        return null;
+      }
+    }
+
     if (value === 'None') {
       return null;
     }
@@ -2250,14 +2850,33 @@ export class DemoMeetingApp
     return value;
   }
 
-  private async getVoiceFocusDeviceTransformer(): Promise<VoiceFocusDeviceTransformer> {
+  private async getVoiceFocusDeviceTransformer(maxComplexity?: VoiceFocusModelComplexity): Promise<VoiceFocusDeviceTransformer> {
     if (this.voiceFocusTransformer) {
       return this.voiceFocusTransformer;
     }
+
+    function exceeds(configured: VoiceFocusModelComplexity): boolean {
+      const max = Number.parseInt(maxComplexity.substring(1), 10);
+      const complexity = Number.parseInt(configured.substring(1), 10);
+      return complexity > max;
+    }
+
     const logger = new ConsoleLogger('SDK', LogLevel.DEBUG);
-    const transformer = await VoiceFocusDeviceTransformer.create(VOICE_FOCUS_SPEC, { logger });
-    this.voiceFocusTransformer = transformer;
-    return transformer;
+
+    // Find out what it will actually execute, and cap it if needed.
+    const spec: VoiceFocusSpec = { ...VOICE_FOCUS_SPEC };
+    const config = await VoiceFocusDeviceTransformer.configure(spec, { logger });
+
+    let transformer;
+    if (maxComplexity && config.supported && exceeds(config.model.variant)) {
+      logger.info(`Downgrading VF to ${maxComplexity}`);
+      spec.variant = maxComplexity;
+      transformer = VoiceFocusDeviceTransformer.create(spec, { logger });
+    } else {
+      transformer = VoiceFocusDeviceTransformer.create(spec, { logger }, config);
+    }
+
+    return this.voiceFocusTransformer = await transformer;
   }
 
   private async createVoiceFocusDevice(inner: Device): Promise<VoiceFocusTransformDevice | Device> {
@@ -2271,7 +2890,7 @@ export class DemoMeetingApp
     }
 
     try {
-      const transformer = await this.getVoiceFocusDeviceTransformer();
+      const transformer = await this.getVoiceFocusDeviceTransformer(MAX_VOICE_FOCUS_COMPLEXITY);
       const vf: VoiceFocusTransformDevice = await transformer.createTransformDevice(inner);
       if (vf) {
         return (this.voiceFocusDevice = vf);
@@ -2337,6 +2956,10 @@ export class DemoMeetingApp
 
     if (videoFilter === 'Segmentation') {
       return new SegmentationProcessor();
+    }
+
+    if (videoFilter === 'Resize (9/16)') {
+      return new ResizeProcessor(0.5625);  // 16/9 Aspect Ratio
     }
 
     return null;
@@ -2566,6 +3189,9 @@ export class DemoMeetingApp
       // Stop listening to attendee presence.
       this.audioVideo.realtimeUnsubscribeToAttendeeIdPresence(this.attendeeIdPresenceHandler);
 
+      // Stop listening to transcript events.
+      this.audioVideo.transcriptionController?.unsubscribeFromTranscriptEvent(this.transcriptEventHandler);
+
       // Stop watching device changes in the UI.
       this.audioVideo.removeDeviceChangeObserver(this);
 
@@ -2592,11 +3218,16 @@ export class DemoMeetingApp
         await this.meetingSessionPOSTLogger?.destroy();
       }, 500);
 
+      if (isDestroyable(this.eventReporter)) {
+        this.eventReporter?.destroy();
+      }
+
       this.audioVideo = undefined;
       this.voiceFocusDevice = undefined;
       this.meetingSession = undefined;
       this.activeSpeakerHandler = undefined;
       this.currentAudioInputDevice = undefined;
+      this.eventReporter = undefined;
     };
 
     const onLeftMeeting = async () => {
@@ -2629,31 +3260,60 @@ export class DemoMeetingApp
         }
   }
 
-  createPinUnpinListener(tileState: VideoTileState): (event: Event) => void {
+  createTargetResolutionListener(tileState: VideoTileState, form: HTMLFormElement): (event: Event) => void {
     return (event: Event): void => {
-      const attendeeId = tileState.boundAttendeeId;
-        if (this.roster[attendeeId].pinned ) {
-          (event.target as HTMLButtonElement).innerText = 'Pin';
-          this.roster[attendeeId].pinned = false;
-        } else {
-          (event.target as HTMLButtonElement).innerText = 'Unpin';
-          this.roster[attendeeId].pinned = true;
-        }
-        this.updateDownlinkPreference();
+      if (!(event.target instanceof HTMLInputElement)) {
+        // Ignore the Label event which will have a stale value
+        return;
       }
+      const attendeeId = tileState.boundAttendeeId;
+      const value = (form.elements.namedItem('level') as RadioNodeList).value;
+      this.log(`target resolution changed for: ${attendeeId} to ${value}`);
+      const targetDisplaySize = ConfigLevelToTargetDisplaySize[value as ConfigLevel];
+      if (this.attendeeIdToVideoPreference.has(attendeeId)) {
+        this.attendeeIdToVideoPreference.get(attendeeId).targetSize = targetDisplaySize;
+      } else {
+        this.attendeeIdToVideoPreference.set(attendeeId, new VideoPreference(attendeeId, DemoMeetingApp.DEFAULT_VIDEO_TILE_PRIORITY, targetDisplaySize));
+      }
+      this.updateDownlinkPreference();
+    }
+  }
+
+  createVideoPriorityListener(tileState: VideoTileState, form: HTMLFormElement): (event: Event) => void {
+    return (event: Event): void => {
+      if (!(event.target instanceof HTMLInputElement)) {
+        // Ignore the Label event which will have a stale value
+        return;
+      }
+      const attendeeId = tileState.boundAttendeeId;
+      const value = (form.elements.namedItem('level') as RadioNodeList).value;
+      this.log(`priority changed for: ${attendeeId} to ${value}`);
+      const priority = ConfigLevelToVideoPriority[value as ConfigLevel];
+      if (this.attendeeIdToVideoPreference.has(attendeeId)) {
+        this.attendeeIdToVideoPreference.get(attendeeId).priority = priority
+      } else {
+        this.attendeeIdToVideoPreference.set(attendeeId, new VideoPreference(attendeeId, priority, DemoMeetingApp.DEFAULT_VIDEO_TILE_TARGET_DISPLAY_SIZE));
+      }
+      this.updateDownlinkPreference();
+    }
   }
 
   updateDownlinkPreference(): void {
+    if (this.attendeeIdToVideoPreference.size === 0) {
+      // Preserve default behavior if no preferences have been set yet
+      this.log('No video preferences set yet, not updating');
+      return;
+    }
+    if (!this.priorityBasedDownlinkPolicy) {
+      return;
+    }
     const videoPreferences = VideoPreferences.prepare();
     for (const attendeeId in this.roster) {
       if (this.roster[attendeeId].hasVideo) {
-        if (this.roster[attendeeId].pinned) {
-          videoPreferences.add(new VideoPreference(attendeeId, 1, TargetDisplaySize.High));
-          this.log(`Pinned video: bwe: new preferences: ${JSON.stringify(videoPreferences)}`);
-        }
-        else {
-          videoPreferences.add(new VideoPreference(attendeeId, 2, TargetDisplaySize.Low));
-          this.log(`Unpinned: bwe: new preferences: ${JSON.stringify(videoPreferences)}`);
+        if (this.attendeeIdToVideoPreference.has(attendeeId)) {
+          videoPreferences.add(this.attendeeIdToVideoPreference.get(attendeeId));
+        } else {
+          videoPreferences.add(new VideoPreference(attendeeId, DemoMeetingApp.DEFAULT_VIDEO_TILE_PRIORITY, DemoMeetingApp.DEFAULT_VIDEO_TILE_TARGET_DISPLAY_SIZE));
         }
       }
     }
@@ -2678,42 +3338,44 @@ export class DemoMeetingApp
       return;
     }
     const tileIndex = tileState.localTile
-      ? 16
+      ? DemoMeetingApp.LOCAL_VIDEO_TILE_INDEX
       : this.tileOrganizer.acquireTileIndex(tileState.tileId);
-    const tileElement = document.getElementById(`tile-${tileIndex}`) as HTMLDivElement;
-    const videoElement = document.getElementById(`video-${tileIndex}`) as HTMLVideoElement;
-    const nameplateElement = document.getElementById(`nameplate-${tileIndex}`) as HTMLDivElement;
-    const pauseStateElement = document.getElementById(`pause-state-${tileIndex}`) as HTMLDivElement;
-    const attendeeIdElement = document.getElementById(`attendeeid-${tileIndex}`) as HTMLDivElement;
-    const pauseButtonElement = document.getElementById(
-      `video-pause-${tileIndex}`
-    ) as HTMLButtonElement;
-    const pinButtonElement = document.getElementById(
-      `video-pin-${tileIndex}`
-    ) as HTMLButtonElement;
+    const demoVideoTile = this.tileIndexToDemoVideoTile.get(tileIndex);
 
-
-    pauseButtonElement.removeEventListener('click', this.tileIndexToPauseEventListener[tileIndex]);
-    this.tileIndexToPauseEventListener[tileIndex] = this.createPauseResumeListener(tileState);
-    pauseButtonElement.addEventListener('click', this.tileIndexToPauseEventListener[tileIndex]);
-    if (this.usePriorityBasedDownlinkPolicy) {
-      this.log('pinButtonElement addEventListener for tileIndex ' + tileIndex);
-      pinButtonElement.removeEventListener('click', this.tileIndexToPinEventListener[tileIndex]);
-      this.tileIndexToPinEventListener[tileIndex] = this.createPinUnpinListener(tileState);
-      pinButtonElement.addEventListener('click', this.tileIndexToPinEventListener[tileIndex]);
+    if (!tileState.localTile) { // Pausing local tile doesn't make sense
+        demoVideoTile.pauseButtonElement.removeEventListener('click', this.tileIndexToPauseEventListener[tileIndex]);
+        this.tileIndexToPauseEventListener[tileIndex] = this.createPauseResumeListener(tileState);
+        demoVideoTile.pauseButtonElement.addEventListener('click', this.tileIndexToPauseEventListener[tileIndex]);
     }
+
+    if (this.usePriorityBasedDownlinkPolicy && !tileState.localTile) { // No current config possible on local tile
+      this.log('adding config listeners for tileIndex ' + tileIndex);
+      demoVideoTile.targetResolutionRadioElement.removeEventListener('click', this.tileIndexToTargetResolutionEventListener[tileIndex]);
+      this.tileIndexToTargetResolutionEventListener[tileIndex] = this.createTargetResolutionListener(tileState, demoVideoTile.targetResolutionRadioElement);
+      demoVideoTile.targetResolutionRadioElement.addEventListener('click', this.tileIndexToTargetResolutionEventListener[tileIndex]);
+
+      demoVideoTile.videoPriorityRadioElement.removeEventListener('click', this.tileIndexToPriorityEventListener[tileIndex]);
+      this.tileIndexToPriorityEventListener[tileIndex] = this.createVideoPriorityListener(tileState, demoVideoTile.videoPriorityRadioElement);
+      demoVideoTile.videoPriorityRadioElement.addEventListener('click', this.tileIndexToPriorityEventListener[tileIndex]);
+    }
+
+    const videoElement = demoVideoTile.videoElement;
     this.log(`binding video tile ${tileState.tileId} to ${videoElement.id}`);
-    this.audioVideo.bindVideoElement(tileState.tileId, videoElement);
+    this.audioVideo.bindVideoElement(tileState.tileId, this.tileIndexToDemoVideoTile.get(tileIndex).videoElement);
+
     this.tileIndexToTileId[tileIndex] = tileState.tileId;
     this.tileIdToTileIndex[tileState.tileId] = tileIndex;
-    this.updateProperty(nameplateElement, 'innerText', tileState.boundExternalUserId.split('#')[1]);
-    this.updateProperty(attendeeIdElement, 'innerText', tileState.boundAttendeeId);
-    if (tileState.paused && this.roster[tileState.boundAttendeeId].bandwidthConstrained) {
-      this.updateProperty(pauseStateElement, 'innerText', '⚡');
-    } else {
-      this.updateProperty(pauseStateElement, 'innerText', '');
+    this.tileIdToAttendeeId[tileState.tileId] = tileState.boundAttendeeId;
+    if (tileState.boundExternalUserId) {
+      demoVideoTile.nameplate = tileState.boundExternalUserId.split('#').slice(-1)[0];
     }
-    this.showTile(tileElement, tileState);
+    demoVideoTile.attendeeId = tileState.boundAttendeeId;
+    if (tileState.paused && this.roster[tileState.boundAttendeeId].bandwidthConstrained) {
+      demoVideoTile.pauseState = '⚡';
+    } else {
+      demoVideoTile.pauseState = '';
+    }
+    demoVideoTile.show(tileState.isContent);
     this.updateGridClasses();
     this.layoutFeaturedTile();
   }
@@ -2721,30 +3383,19 @@ export class DemoMeetingApp
   videoTileWasRemoved(tileId: number): void {
     const tileIndex = this.tileOrganizer.releaseTileIndex(tileId);
     this.log(`video tileId removed: ${tileId} from tile-${tileIndex}`);
+    const demoVideoTile = this.tileIndexToDemoVideoTile.get(tileIndex);
+    demoVideoTile.pauseButtonElement.removeEventListener('click', this.tileIndexToPauseEventListener[tileIndex]);
     if (this.usePriorityBasedDownlinkPolicy) {
-      const pinButtonElement = document.getElementById(`video-pin-${tileIndex}`) as HTMLButtonElement;
-      pinButtonElement.removeEventListener('click', this.tileIndexToPinEventListener[tileIndex]);
+      demoVideoTile.targetResolutionRadioElement.removeEventListener('click', this.tileIndexToTargetResolutionEventListener[tileIndex]);
+      demoVideoTile.videoPriorityRadioElement.removeEventListener('click', this.tileIndexToPriorityEventListener[tileIndex]);
     }
-    this.hideTile(tileIndex);
+    demoVideoTile.hide();
     this.updateGridClasses();
   }
 
   videoAvailabilityDidChange(availability: MeetingSessionVideoAvailability): void {
     this.canStartLocalVideo = availability.canStartLocalVideo;
     this.log(`video availability changed: canStartLocalVideo  ${availability.canStartLocalVideo}`);
-  }
-
-  showTile(tileElement: HTMLDivElement, tileState: VideoTileState): void {
-    tileElement.classList.add(`active`);
-
-    if (tileState.isContent) {
-      tileElement.classList.add('content');
-    }
-  }
-
-  hideTile(tileIndex: number): void {
-    const tileElement = document.getElementById(`tile-${tileIndex}`) as HTMLDivElement;
-    tileElement.classList.remove('active', 'featured', 'content');
   }
 
   tileIdForAttendeeId(attendeeId: string): number | null {
@@ -2790,13 +3441,13 @@ export class DemoMeetingApp
 
     for (let i = 0; i < tilesIndices.length; i++) {
       const tileIndex = tilesIndices[i];
-      const tileElement = document.getElementById(`tile-${tileIndex}`) as HTMLDivElement;
+      const demoVideoTile = this.tileIndexToDemoVideoTile.get(tileIndex);
       const tileId = this.tileIndexToTileId[tileIndex];
 
       if (tileId === activeTile && tileId !== localTileId) {
-        tileElement.classList.add('featured');
+        demoVideoTile.featured = true;
       } else {
-        tileElement.classList.remove('featured');
+        demoVideoTile.featured = false;
       }
     }
 
@@ -2807,7 +3458,7 @@ export class DemoMeetingApp
     const localTileId = this.localTileId();
     const activeTile = this.activeTileId();
 
-    this.tileArea.className = `v-grid size-${this.availablelTileSize()}`;
+    this.tileArea.className = `v-grid size-${this.videoTileCount()}`;
 
     if (activeTile && activeTile !== localTileId) {
       this.tileArea.classList.add('featured');
@@ -2816,7 +3467,7 @@ export class DemoMeetingApp
     }
   }
 
-  availablelTileSize(): number {
+  videoTileCount(): number {
     return (
       this.tileOrganizer.remoteTileCount + (this.audioVideo.hasStartedLocalVideoTile() ? 1 : 0)
     );
@@ -2834,9 +3485,24 @@ export class DemoMeetingApp
     return tiles;
   }
 
-  setUpVideoTileElementResizer(): void {
+  setupVideoTiles(): void {
+    const tileArea = document.getElementById(`tile-area`);
     for (let i = 0; i <= DemoTileOrganizer.MAX_TILES; i++) {
-      const videoElem = document.getElementById(`video-${i}`) as HTMLVideoElement;
+      const tile = document.createElement('video-tile') as DemoVideoTile
+      // `DemoVideoTile` requires being added to DOM before calling any functions
+      tileArea.appendChild(tile);
+
+      tile.tileIndex = i;
+      if (i === DemoMeetingApp.LOCAL_VIDEO_TILE_INDEX) {
+        // Don't show config or pause on local video because they don't make sense there
+        tile.showConfigDropdown = false;
+        tile.showRemoteVideoPreferences = false;
+      }
+
+      this.tileIndexToDemoVideoTile.set(i, tile);
+
+      // Setup tile element resizer
+      const videoElem = tile.videoElement;
       videoElem.onresize = () => {
         if (videoElem.videoHeight > videoElem.videoWidth) {
           // portrait mode
@@ -2849,6 +3515,7 @@ export class DemoMeetingApp
         }
       };
     }
+
   }
 
   allowMaxContentShare(): boolean {
@@ -2905,9 +3572,6 @@ export class DemoMeetingApp
 
   remoteVideoSourcesDidChange(videoSources: VideoSource[]): void {
     this.log(`available remote video sources changed: ${JSON.stringify(videoSources)}`);
-    if (!this.usePriorityBasedDownlinkPolicy) {
-      return;
-    }
     for (const attendeeId in this.roster) {
       this.roster[attendeeId].hasVideo = false;
     }
@@ -2939,4 +3603,11 @@ export class DemoMeetingApp
 
 window.addEventListener('load', () => {
   new DemoMeetingApp();
+});
+
+window.addEventListener('click', event => {
+  const liveTranscriptionModal = document.getElementById('live-transcription-modal');
+  if (event.target === liveTranscriptionModal) {
+    liveTranscriptionModal.style.display = 'none';
+  }
 });

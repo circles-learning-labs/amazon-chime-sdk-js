@@ -2,9 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import ConnectionHealthPolicyConfiguration from '../connectionhealthpolicy/ConnectionHealthPolicyConfiguration';
-import AllHighestVideoBandwidthPolicy from '../videodownlinkbandwidthpolicy/AllHighestVideoBandwidthPolicy';
+import { toLowerCasePropertyNames } from '../utils/Utils';
 import VideoDownlinkBandwidthPolicy from '../videodownlinkbandwidthpolicy/VideoDownlinkBandwidthPolicy';
-import NScaleVideoUplinkBandwidthPolicy from '../videouplinkbandwidthpolicy/NScaleVideoUplinkBandwidthPolicy';
 import VideoUplinkBandwidthPolicy from '../videouplinkbandwidthpolicy/VideoUplinkBandwidthPolicy';
 import MeetingSessionCredentials from './MeetingSessionCredentials';
 import MeetingSessionURLs from './MeetingSessionURLs';
@@ -152,7 +151,7 @@ export default class MeetingSessionConfiguration {
    */
   constructor(createMeetingResponse?: any, createAttendeeResponse?: any) { // eslint-disable-line
     if (createMeetingResponse) {
-      createMeetingResponse = this.toLowerCasePropertyNames(createMeetingResponse);
+      createMeetingResponse = toLowerCasePropertyNames(createMeetingResponse);
       if (createMeetingResponse.meeting) {
         createMeetingResponse = createMeetingResponse.meeting;
       }
@@ -165,9 +164,12 @@ export default class MeetingSessionConfiguration {
       this.urls.screenViewingURL = createMeetingResponse.mediaplacement.screenviewingurl;
       this.urls.signalingURL = createMeetingResponse.mediaplacement.signalingurl;
       this.urls.turnControlURL = createMeetingResponse.mediaplacement.turncontrolurl;
+      if (createMeetingResponse.mediaplacement.eventingestionurl) {
+        this.urls.eventIngestionURL = createMeetingResponse.mediaplacement.eventingestionurl;
+      }
     }
     if (createAttendeeResponse) {
-      createAttendeeResponse = this.toLowerCasePropertyNames(createAttendeeResponse);
+      createAttendeeResponse = toLowerCasePropertyNames(createAttendeeResponse);
       if (createAttendeeResponse.attendee) {
         createAttendeeResponse = createAttendeeResponse.attendee;
       }
@@ -176,31 +178,5 @@ export default class MeetingSessionConfiguration {
       this.credentials.externalUserId = createAttendeeResponse.externaluserid;
       this.credentials.joinToken = createAttendeeResponse.jointoken;
     }
-
-    // simulcast feature flag will override the following policies when DefaultAudioVideoController is created
-    this.videoDownlinkBandwidthPolicy = new AllHighestVideoBandwidthPolicy(
-      this.credentials ? this.credentials.attendeeId : null
-    );
-    this.videoUplinkBandwidthPolicy = new NScaleVideoUplinkBandwidthPolicy(
-      this.credentials ? this.credentials.attendeeId : null
-    );
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private toLowerCasePropertyNames(input: any): any {
-    if (input === null) {
-      return null;
-    } else if (typeof input !== 'object') {
-      return input;
-    } else if (Array.isArray(input)) {
-      return input.map(this.toLowerCasePropertyNames);
-    }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return Object.keys(input).reduce((result: any, key: string) => {
-      const value = input[key];
-      const newValue = typeof value === 'object' ? this.toLowerCasePropertyNames(value) : value;
-      result[key.toLowerCase()] = newValue;
-      return result;
-    }, {});
   }
 }

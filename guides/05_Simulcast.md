@@ -7,6 +7,9 @@ Simulcast is currently disabled by default. To enable it [MeetingSessionConfigur
 
 The [VideoAdaptiveProbePolicy](https://aws.github.io/amazon-chime-sdk-js/classes/videoadaptiveprobepolicy.html) downlink policy adaptively subscribes to the best simulcast layer and is automatically selected if [MeetingSessionConfiguration.enableUnifiedPlanForChromiumBasedBrowsers](https://aws.github.io/amazon-chime-sdk-js/classes/meetingsessionconfiguration.html#enableunifiedplanforchromiumbasedbrowsers) and [MeetingSessionConfiguration.enableSimulcastForUnifiedPlanChromiumBasedBrowsers](https://aws.github.io/amazon-chime-sdk-js/classes/meetingsessionconfiguration.html#enablesimulcastforunifiedplanchromiumbasedbrowsers) are set to true.
 
+If you want more fine-grained control of which simulcast layer to subscribe, please use [VideoPriorityBasedPolicy](https://aws.github.io/amazon-chime-sdk-js/classes/videoprioritybasedpolicy). More details about priority-based downlink policy can be 
+found [here](https://aws.github.io/amazon-chime-sdk-js/modules/prioritybased_downlink_policy.html).
+
 ## Details
 
 ### Simulcast overview
@@ -83,6 +86,9 @@ in the created [MeetingSessionConfiguration](https://aws.github.io/amazon-chime-
 ```javascript
 configuration.enableUnifiedPlanForChromiumBasedBrowsers = true;
 configuration.enableSimulcastForUnifiedPlanChromiumBasedBrowsers = true;
+
+//Specify the apdative probe downlink policy
+configuration.videoDownlinkBandwidthPolicy = new VideoAdaptiveProbePolicy(logger);
 ```
 
 Now create a meeting session with the simulcast enabled meeting session configuration.
@@ -126,4 +132,21 @@ const observer = {
 }
 
 meetingSession.audioVideo.addObserver(observer);
+```
+### Custom Simulcast Policy
+If the default simulcast uplink policy does not work for you, you can create your own simulcast video uplink policy 
+by implementing [SimulcastUplinkPolicy](https://aws.github.io/amazon-chime-sdk-js/interfaces/simulcastuplinkpolicy.html) 
+and set the video uplink policy via [MeetingSessionConfiguration.videoUplinkBandwidthPolicy](https://aws.github.io/amazon-chime-sdk-js/classes/meetingsessionconfiguration.html#videouplinkbandwidthpolicy).
+
+```typescript
+export default class MySimulcastUplinkPolicy implements SimulcastUplinkPolicy {
+}
+
+const browserBehavior = new DefaultBrowserBehavior({
+  enableUnifiedPlanForChromiumBasedBrowsers: meetingConfiguration.enableUnifiedPlanForChromiumBasedBrowsers
+});
+
+if (browserBehavior.isSimulcastSupported()) {
+  meetingConfiguration.videoUplinkBandwidthPolicy = new MySimulcastUplinkPolicy();
+}
 ```
