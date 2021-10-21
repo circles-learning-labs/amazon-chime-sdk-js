@@ -913,7 +913,10 @@ export default class DefaultAudioVideoController
   }
 
   updateLocalVideoFromPolicy(): boolean {
-    if (this.mayNeedRenegotiationForSimulcastLayerChange) {
+    if (
+      this.mayNeedRenegotiationForSimulcastLayerChange &&
+      !this.negotiatedBitrateLayersAllocationRtpHeaderExtension()
+    ) {
       this.logger.info('Needs regenotiation for local video simulcast layer change');
       this.mayNeedRenegotiationForSimulcastLayerChange = false;
       return false;
@@ -930,6 +933,22 @@ export default class DefaultAudioVideoController
       new ReceiveVideoInputTask(this.meetingSessionContext).run();
     }
     return true;
+  }
+
+  private negotiatedBitrateLayersAllocationRtpHeaderExtension(): boolean {
+    if (!this.meetingSessionContext.transceiverController.localVideoTransceiver()) {
+      return false;
+    }
+    const parameters = this.meetingSessionContext.transceiverController
+      .localVideoTransceiver()
+      .sender.getParameters();
+    if (!parameters || !parameters.headerExtensions) {
+      return false;
+    }
+    return parameters.headerExtensions.some(
+      extension =>
+        extension.uri === 'http://www.webrtc.org/experiments/rtp-hdrext/video-layers-allocation00'
+    );
   }
 
   restartLocalVideo(callback: () => void): boolean {
