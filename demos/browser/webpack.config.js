@@ -1,11 +1,59 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+/**
+ * See also webpack.config.hot.js, which is a fork of this file.
+ * Please make changes in both places if applicable.
+ */
+
 /* eslint-disable */
-var webpack = require('webpack');
-var HtmlWebpackPlugin = require('html-webpack-plugin');
+const webpack = require('webpack');
+const HtmlWebpackPlugin = require('html-webpack-plugin');
+const CspHtmlWebpackPlugin = require('csp-html-webpack-plugin');
 const InlineChunkHtmlPlugin = require('react-dev-utils/InlineChunkHtmlPlugin');
 /* eslint-enable */
+
+/**
+ * This is exactly what we document in the CSP guide.
+ */
+const csp = {
+  'connect-src': "'self' https://*.chime.aws wss://*.chime.aws https://*.amazonaws.com",
+
+  // 'wasm-unsafe-eval' is to allow Amazon Voice Focus to work in Chrome 95+.
+  // Strictly speaking, this should be enough, but the worker cannot compile WebAssembly unless
+  // 'unsafe-eval' is also present.
+  'script-src': "'self' 'unsafe-eval' 'wasm-eval' 'wasm-unsafe-eval'",
+
+  // Script hashes/nonces are not emitted for script-src-elem, so just add unsafe-inline.
+  'script-src-elem': "'self' 'unsafe-inline'",
+  'worker-src': "'self' blob:",
+  'child-src': "'self' blob:",
+};
+
+// Modify our basic CSP to allow several things:
+// 1. Access to assets in all stages for testing and canaries.
+for (const stage of ['a', 'b', 'g', '']) {
+  const host = ` https://*.sdkassets.${stage}chime.aws`;
+  const media = ` wss://*.${stage}chime.aws`;
+  csp['connect-src'] += host + media;
+  csp['script-src'] += host;
+  csp['script-src-elem'] += host;
+}
+
+// 2. Access to googleapis for the Segmentation filter 
+csp['connect-src'] += ' https://storage.googleapis.com';
+
+// 3. Access to jsdelivr for TensorFlow for background blur.
+csp['script-src'] += ' https://cdn.jsdelivr.net';
+csp['script-src-elem'] += ' https://cdn.jsdelivr.net';
+
+// 4. Add 'unsafe-eval' because TensorFlow needs it.
+if (!csp['script-src'].includes("'unsafe-eval'")) {
+  csp['script-src'] += " 'unsafe-eval'";
+}
+
+// 5. Access to event ingestion gamma endpoint for testing and canaries.
+csp['connect-src'] += ' https://*.ingest.gchime.aws';
 
 module.exports = env => {
   console.info('Env:', JSON.stringify(env, null, 2));
@@ -14,7 +62,6 @@ module.exports = env => {
   console.info('Using app', app);
   return {
     devServer: {
-      hot: true,
       devMiddleware: {
         index: `${app}.html`
       },
@@ -36,6 +83,7 @@ module.exports = env => {
       }
     },
     plugins: [
+      new CspHtmlWebpackPlugin(csp),
       new HtmlWebpackPlugin({
         inlineSource: '.(js|css)$',
         template: __dirname + `/app/${app}/${app}.html`,
@@ -92,7 +140,7 @@ module.exports = env => {
         },
       ],
     },
-    mode: 'development',
+    mode: 'production',
     performance: {
       hints: false,
     },

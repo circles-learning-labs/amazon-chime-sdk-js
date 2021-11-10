@@ -5,12 +5,54 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.21.0] - 2021-11-01
+
+### Added
+
+- Add support for layers allocation negotiation in Chromium based browsers to avoid resubscribing to preemptively turn off simulcast streams or to switch layers.
+- Update browser compatibility doc for background blur
+- Add a doc to guide builders on managing video quality for different video layouts. See [guide](https://aws.github.io/amazon-chime-sdk-js/modules/videolayout.html).
+
+### Removed
+
+### Fixed
+
+- Fix disabling of send streams when local video was not enabled by integrating empty encoder params into `VideoStreamIndex` when sending is disabled.
+- Fix `visibilitychange` typo in `InMemoryJSONEventBuffer`.
+  
+### Changed
+
+- Ignore `enableUnifiedPlanForChromiumBasedBrowsers` value (i.e. treat as always equaling the current default value of `true`) in `MeetingSesstionConfiguration`.  Chrome is [in the processing](https://groups.google.com/g/discuss-webrtc/c/UBtZfawdIAA/m/m-4wnVHXBgAJ) of deprecating and removing Plan-B which would cause breakage in applications still trying to use it.  This will have no effect on SDK behavior` and has been the default since 1.17.0.
+- Change `appVersionName` and `appVersionCode` fields to `appName` and `appVersion` respectively.
+- Update similar log messages in `DefaultMessagingSession` and `DefaultSignalingClient`. 
+
+## [2.20.1] - 2021-10-27
+
+### Fixed
+
+- Prevent error `'scaleResolutionDownBy' member of RTCRtpEncodingParameters is not a finite floating-point value` 
+  thrown by NScale video uplink bandwidth policy when there is no height information from the sending video stream.
+
+## [2.20.0] - 2021-10-18
+
+### Added
+
+- Add background blur video frame processor to enable background blur on streaming video. See [guide](https://aws.github.io/amazon-chime-sdk-js/modules/backgroundfilter_video_processor.html)
+
+### Removed
+
+### Fixed
+
+### Changed
+
+## [2.19.0] - 2021-10-14
 
 ### Added
 
 - Add API `isSimulcastSupported` so applications can check whether simulcast can be enabled and pass corresponding policy.
 - Add `bindToTileController` optional method to `VideoDownlinkBandwidthPolicy`.
+- Add [Content Security Policy](https://aws.github.io/amazon-chime-sdk-js/modules/contentsecurity_policy.html) setup guide for customers who want to secure their application and add CSP headers.
+- Add `securitypolicyviolation` event listener to listen for CSP violations. If customers have set up CSP for their app, the event listener will detect violations and print warnings.
   
 ### Removed
 
@@ -19,9 +61,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Amazon Voice Focus now works in Chrome 95 or later: WebAssembly policy changes required a change in how modules were loaded. This requires additional Content Security Policy changes, which are documented in the [CSP guide](https://aws.github.io/amazon-chime-sdk-js/modules/contentsecurity_policy.html) and the [Amazon Voice Focus guide](https://aws.github.io/amazon-chime-sdk-js/modules/amazonvoice_focus.html).
 - Add safeguard in `ReceivedVideoInputTask` to prevent crashing when video input stream does not contain any video track.
 - Add missing `captureOutputPrefix` param for SDK demo app in release script.
-- Amazon Voice Focus now works in Chrome 95 or later: WebAssembly policy changes required a change in how modules were loaded.
 - Add opt-in region `eu-south-1` to meetings demo in deploy-canary-demo script to support media capture canary.
 - Fix bug: DOMException: The play() request was interrupted by a new load request. https://goo.gl/LdLk22.
 - Fix `removeObserver` function in `DefaultVideoTransformDevice`.
@@ -38,6 +80,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update the default priority-based video downlink policy to adjust target size based on number of videos in the meeting.
 - Add a new section "Known Browser Issues" in FAQ.html.
 - Refactor some types to avoid a circular dependency (#1565).
+- Update package.json to include npm 8.
+- Update mocha to version 9.
   
 ## [2.18.0] - 2021-09-22
 
@@ -46,8 +90,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add events `meetingReconnected`, `signalingDropped` and `receivingAudioDropped` to `eventDidReceive` by publishing them as stand alone events. Currently, these events were only included in the meeting history attribute when a meeting event is published. 
 - Added support for skipping full SDP renegotiations when switching simulcast streams.  This will result in less freezing when switching between layers in response to a network event as done in `VideoPriorityBasedPolicy`.  This will have no impact if not using simulcast.
 - Add link to SIP Media Application examples in README.
-- Add [Content Security Policy](https://aws.github.io/amazon-chime-sdk-js/modules/contentsecurity_policy.html) setup guide for customers who want to secure their application and add CSP headers.
-- Add `securitypolicyviolation` event listener to listen for CSP violations. If customers have set up CSP for their app, the event listener will detect violations and print warnings.
 
 ### Removed
 

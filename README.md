@@ -1,23 +1,30 @@
 # Amazon Chime SDK for JavaScript
+
 [Amazon Chime SDK Project Board](https://github.com/orgs/aws/projects/12)
 
 [Amazon Chime SDK React Components](https://github.com/aws/amazon-chime-sdk-component-library-react)
 
 <a href="https://www.npmjs.com/package/amazon-chime-sdk-js"><img src="https://img.shields.io/npm/v/amazon-chime-sdk-js?style=flat-square"></a>
 <a href="https://github.com/aws/amazon-chime-sdk-js/actions?query=workflow%3A%22Deploy+Demo+App+Workflow%22"><img src="https://github.com/aws/amazon-chime-sdk-js/workflows/Deploy%20Demo%20App%20Workflow/badge.svg"></a>
-### Build video calling, audio calling, and screen sharing applications powered by Amazon Chime.
 
-The Amazon Chime SDK makes it easy to add collaborative audio calling,
-video calling, and screen share features to web applications by using
-the same infrastructure services that power millions of Amazon Chime
-online meetings.
+## Build video calling, audio calling, messaging, and screen sharing applications powered by the Amazon Chime SDK
 
-This Amazon Chime SDK for JavaScript works by connecting to meeting session
-resources that you have created in your AWS account. The SDK has everything
+The Amazon Chime SDK is a set of real-time communications components that developers can
+use to quickly add messaging, audio, video, and screen sharing capabilities to their web or
+mobile applications.
+
+Developers can build on AWS's global communications infrastructure to deliver
+engaging experiences in their applications. For example, they can add video to a
+health application so patients can consult remotely with doctors on health
+issues, or create customized audio prompts for integration with the public
+telephone network.
+
+The Amazon Chime SDK for JavaScript works by connecting to meeting session
+resources that you create in your AWS account. The SDK has everything
 you need to build custom calling and collaboration experiences in your
-web application, including methods to: configure meeting sessions, list and
+web application, including methods to configure meeting sessions, list and
 select audio and video devices, start and stop screen share and screen share
-viewing, receive callbacks when media events occur such as volume changes, and
+viewing, receive callbacks when media events such as volume changes occur, and
 control meeting features such as audio mute and video tile bindings.
 
 If you are building a React application, consider using the [Amazon Chime SDK React Component Library](https://github.com/aws/amazon-chime-sdk-component-library-react) that supplies client-side state management and reusable UI components for common web interfaces used in audio and video conferencing applications. Amazon Chime also offers [Amazon Chime SDK for iOS](https://github.com/aws/amazon-chime-sdk-ios) and [Amazon Chime SDK for Android](https://github.com/aws/amazon-chime-sdk-android) for native mobile application development.
@@ -30,24 +37,49 @@ The [Amazon Chime SDK Project Board](https://github.com/orgs/aws/projects/12) ca
 - [Pricing](https://aws.amazon.com/chime/pricing/#Chime_SDK_)
 - [Supported Browsers](https://docs.aws.amazon.com/chime/latest/dg/meetings-sdk.html#mtg-browsers)
 - [Developer Guide](https://docs.aws.amazon.com/chime/latest/dg/meetings-sdk.html)
+- [PSTN Audio Developer Guide](https://docs.aws.amazon.com/chime/latest/dg/build-lambdas-for-sip-sdk.html)
 - [Control Plane API Reference](https://docs.aws.amazon.com/chime/latest/APIReference/Welcome.html)
+- [Frequently Asked Questions (FAQ)](https://aws.github.io/amazon-chime-sdk-js/modules/faqs.html)
 
 ## Blog posts
 
-- [High Level Architecture — Building a Meeting Application with the Amazon Chime SDK](https://aws.amazon.com/blogs/business-productivity/building-a-meeting-application-using-the-amazon-chime-sdk/)
-- [Understanding security in Amazon Chime](https://aws.amazon.com/blogs/business-productivity/understanding-security-in-the-amazon-chime-application-and-sdk/)
-- [Transforming audio and shared content](https://aws.amazon.com/blogs/business-productivity/transforming-audio-and-shared-content-in-the-amazon-chime-sdk-for-javascript/)
-- [Capturing Amazon Chime SDK Meeting Content](https://aws.amazon.com/blogs/business-productivity/capture-amazon-chime-sdk-meetings-using-media-capture-pipelines/)
-- [Quickly launch an Amazon Chime SDK application with AWS Amplify](https://aws.amazon.com/blogs/business-productivity/quickly-launch-an-amazon-chime-sdk-application-with-aws-amplify/)
-- [Monitoring and troubleshooting with Amazon Chime SDK meeting events](https://aws.amazon.com/blogs/business-productivity/monitoring-and-troubleshooting-with-amazon-chime-sdk-meeting-events/)
+In addition to the below, here is a list of [all blog posts about the Amazon Chime SDK](https://aws.amazon.com/blogs/business-productivity/tag/amazon-chime-sdk/).
 
-Here is a list of all blog posts about the Amazon Chime SDK](https://aws.amazon.com/blogs/business-productivity/tag/amazon-chime-sdk/).
+### High level
+
+- [High Level Architecture — Building a Meeting Application With the Amazon Chime SDK](https://aws.amazon.com/blogs/business-productivity/building-a-meeting-application-using-the-amazon-chime-sdk/)
+- [Understanding security in Amazon Chime Application and SDK](https://aws.amazon.com/blogs/business-productivity/understanding-security-in-the-amazon-chime-application-and-sdk/)
+
+### Frontend
+
+- [Transforming Audio and Shared Content](https://aws.amazon.com/blogs/business-productivity/transforming-audio-and-shared-content-in-the-amazon-chime-sdk-for-javascript/)
+- [Quickly Launch an Amazon Chime SDK Application With AWS Amplify](https://aws.amazon.com/blogs/business-productivity/quickly-launch-an-amazon-chime-sdk-application-with-aws-amplify/)
+
+### Full stack and PSTN
+
+- [Capturing Amazon Chime SDK Meeting Content](https://aws.amazon.com/blogs/business-productivity/capture-amazon-chime-sdk-meetings-using-media-capture-pipelines/)
+- [Monitoring and Troubleshooting With Amazon Chime SDK Meeting Events](https://aws.amazon.com/blogs/business-productivity/monitoring-and-troubleshooting-with-amazon-chime-sdk-meeting-events/)
+- [Build Meetings features into your Amazon Chime SDK messaging application](https://aws.amazon.com/blogs/business-productivity/build-meeting-features-into-your-amazon-chime-sdk-messaging-application/)
+- [Integrating PSTN callers with Amazon Chime SDK meetings](https://aws.amazon.com/blogs/business-productivity/integrating-pstn-callers-with-amazon-chime-sdk-meetings/)
+- [Using the Amazon Chime SDK to Create Automated Outbound Call Notifications](https://aws.amazon.com/blogs/business-productivity/using-the-amazon-chime-sdk-to-create-automated-outbound-call-notifications/)
+- [Building voice menus and call routing with the Amazon Chime SDK](https://aws.amazon.com/blogs/business-productivity/building-voice-menus-and-call-routing-with-the-amazon-chime-sdk/)
+
+### Messaging
+
+- [Use channel flows to remove profanity and sensitive content from messages in Amazon Chime SDK messaging](https://aws.amazon.com/blogs/business-productivity/use-channel-flows-to-remove-profanity-and-sensitive-content-from-messages-in-amazon-chime-sdk-messaging/)
+- [Automated Moderation and Sentiment Analysis Blog (example using Kinesis Data Streams)](https://aws.amazon.com/blogs/business-productivity/automated-moderation-and-sentiment-analysis-with-amazon-chime-sdk-messaging)
+- [Build chat applications in iOS and Android with Amazon Chime SDK messaging](https://aws.amazon.com/blogs/business-productivity/build-chat-applications-in-ios-and-android-with-amazon-chime-sdk-messaging/)
+- [Building chat features into your application with Amazon Chime SDK messaging](https://aws.amazon.com/blogs/business-productivity/build-chat-features-into-your-application-with-amazon-chime-sdk-messaging/)
+- [Integrate your Identity Provider with Amazon Chime SDK Messaging](https://aws.amazon.com/blogs/business-productivity/integrate-your-identity-provider-with-amazon-chime-sdk-messaging/)
+- [Creating Read-Only Chat Channels for Announcements](https://aws.amazon.com/blogs/business-productivity/creating-read-only-chat-channels-for-announcements-with-amazon-chime-sdk-messaging/)
+- [Real-time Collaboration Using Amazon Chime SDK messaging](https://aws.amazon.com/blogs/business-productivity/real-time-collaboration-using-amazon-chime-sdk-messaging/)
+- [Building a Live Streaming Chat Application](https://aws.amazon.com/blogs/business-productivity/build-a-live-streaming-chat-application-using-amazon-ivs-and-amazon-chime-sdk)
 
 ### Webinars and videos
 
 - [Webinar: Creating Classroom Experiences Using the Amazon Chime SDK](https://www.youtube.com/watch?v=S8T-0xfvXJ8)
 
-## Guides
+## JavaScript SDK Guides
 
 The following developer guides cover specific topics for a technical audience.
 
@@ -56,19 +88,29 @@ The following developer guides cover specific topics for a technical audience.
 - [Content Share](https://aws.github.io/amazon-chime-sdk-js/modules/contentshare.html)
 - [Quality, Bandwidth, and Connectivity](https://aws.github.io/amazon-chime-sdk-js/modules/qualitybandwidth_connectivity.html)
 - [Simulcast](https://aws.github.io/amazon-chime-sdk-js/modules/simulcast.html)
-- [Meeting events](https://aws.github.io/amazon-chime-sdk-js/modules/meetingevents.html)
-- [Integrating Amazon Voice Focus into your application](https://aws.github.io/amazon-chime-sdk-js/modules/amazonvoice_focus.html)
-- [Adding frame-by-frame processing to an outgoing video stream](https://aws.github.io/amazon-chime-sdk-js/modules/videoprocessor.html)
-- [Adapting video to limited bandwidth using a priority-based video downlink policy](https://aws.github.io/amazon-chime-sdk-js/modules/prioritybased_downlink_policy.html)
-- [Client event ingestion](https://aws.github.io/amazon-chime-sdk-js/modules/clientevent_ingestion.html)
+- [Meeting Events](https://aws.github.io/amazon-chime-sdk-js/modules/meetingevents.html)
+- [Integrating Amazon Voice Focus Into Your Application](https://aws.github.io/amazon-chime-sdk-js/modules/amazonvoice_focus.html)
+- [Adding Frame-By-Frame Processing to an Outgoing Video Stream](https://aws.github.io/amazon-chime-sdk-js/modules/videoprocessor.html)
+- [Adding Background Filtering to an Outgoing Video Stream](https://aws.github.io/amazon-chime-sdk-js/modules/backgroundfilter_video_processor.html)
+- [Adapting Video to Limited Bandwidth Using a Priority-Based Video Downlink Policy](https://aws.github.io/amazon-chime-sdk-js/modules/prioritybased_downlink_policy.html)
+- [Client Event Ingestion](https://aws.github.io/amazon-chime-sdk-js/modules/clientevent_ingestion.html)
 - [Content Security Policy](https://aws.github.io/amazon-chime-sdk-js/modules/contentsecurity_policy.html)
+- [Managing Video Quality for Different Video Layouts](https://aws.github.io/amazon-chime-sdk-js/modules/videolayout.html)
 
 ## Migration Guides
-- [Migrating from v1.0 to v2.0](https://aws.github.io/amazon-chime-sdk-js/modules/migrationto_2_0.html)
+
+- [Migrating From V1.0 to V2.0](https://aws.github.io/amazon-chime-sdk-js/modules/migrationto_2_0.html)
+
+## Developer Guides
+
+The following developer guides cover the Amazon Chime SDK more broadly.
+
+- [PSTN Audio developer guide](https://docs.aws.amazon.com/chime/latest/dg/build-lambdas-for-sip-sdk.html)
+- [Messaging developer guide](https://docs.aws.amazon.com/chime/latest/dg/using-the-messaging-sdk.html)
 
 ## Examples
 
-- [Amazon Chime SDK Samples](https://github.com/aws-samples/amazon-chime-sdk) - Amazon Chime SDK Samples repository
+- [Amazon Chime SDK Samples](https://github.com/aws-samples/amazon-chime-sdk) — Amazon Chime SDK Samples repository
 - [Meeting Demo](https://github.com/aws/amazon-chime-sdk-js/tree/master/demos/browser) — A browser
  meeting application with a local server
 - [Serverless Meeting Demo](https://github.com/aws/amazon-chime-sdk-js/tree/master/demos/serverless) — A self-contained serverless meeting application
@@ -81,19 +123,24 @@ The following developer guides cover specific topics for a technical audience.
 - [Device Integration](https://aws.amazon.com/blogs/business-productivity/using-the-amazon-chime-sdk-for-3rd-party-devices/) — Using the Amazon Chime SDK for 3rd party devices
 - [Messaging](https://aws.amazon.com/blogs/business-productivity/build-chat-features-into-your-application-with-amazon-chime-sdk-messaging/) — Build chat features into your application with Amazon Chime SDK messaging
 
-### SIP Media Application Examples
-- [PSTN Dial In](https://github.com/aws-samples/chime-sipmediaapplication-samples) —  Add PSTN dialin capabilities to your Amazon Chime SDK Meeting using SIP media application
-- [Outbound Call Notifications](https://github.com/aws-samples/amazon-chime-sma-outbound-call-notifications) - Send meeting reminders with SIP media application and get real time results back.
+### PSTN Audio Examples
+
+- [PSTN Dial In](https://github.com/aws-samples/chime-sipmediaapplication-samples) — Add PSTN dial-in capabilities to your Amazon Chime SDK Meeting using SIP media application
+- [Outbound Call Notifications](https://github.com/aws-samples/amazon-chime-sma-outbound-call-notifications) — Send meeting reminders with SIP media application and get real time results back
 - [Update In-Progress Call](https://github.com/aws-samples/amazon-chime-sma-update-call) - Update an in-progress SIP media application call via API call
   
 ## Troubleshooting and Support
-Review the resources given in the ReadMe and use our [client documentation](https://aws.github.io/amazon-chime-sdk-js/) for guidance on how to develop on the Chime SDK for JavaScript. Additionally, search our [issues database](https://github.com/aws/amazon-chime-sdk-js/issues) and [FAQs](https://aws.github.io/amazon-chime-sdk-js/modules/faqs.html) to see if your issue is already addressed. If not please cut us an [issue](https://github.com/aws/amazon-chime-sdk-js/issues/new/choose) using the provided templates.
+
+Review the resources given in the README and use our [client documentation](https://aws.github.io/amazon-chime-sdk-js/) for guidance on how to develop on the Chime SDK for JavaScript. Additionally, search our [issues database](https://github.com/aws/amazon-chime-sdk-js/issues) and [FAQs](https://aws.github.io/amazon-chime-sdk-js/modules/faqs.html) to see if your issue is already addressed. If not please cut us an [issue](https://github.com/aws/amazon-chime-sdk-js/issues/new/choose) using the provided templates.
+
+The blog post [Monitoring and Troubleshooting With Amazon Chime SDK Meeting Events](https://aws.amazon.com/blogs/business-productivity/monitoring-and-troubleshooting-with-amazon-chime-sdk-meeting-events/) goes into detail about how to use meeting events to troubleshoot your application by logging to Amazon CloudWatch.
 
 If you have more questions, or require support for your business, you can reach out to [AWS Customer support](https://pages.awscloud.com/GLOBAL-aware-GC-Amazon-Chime-SDK-2020-reg.html). You can review our support plans [here](https://aws.amazon.com/premiumsupport/plans/?nc=sn&loc=1).
 
-
 ## WebRTC Resources
-> Amazon Chime JS SDK uses WebRTC and hence here are some general resources on WebRTC.
+
+The Amazon Chime SDK for JavaScript uses WebRTC, the real-time communication API supported in most modern browsers. Here are some general resources on WebRTC.
+
 - [WebRTC Basics](https://www.html5rocks.com/en/tutorials/webrtc/basics/)
 - [WebRTC Org - Getting started, presentation, samples, tutorials, books and more resources](https://webrtc.github.io/webrtc-org/start/)
 - [High Performance Browser Networking - WebRTC (Browser APIs and Protocols)](https://hpbn.co/webrtc/)
@@ -106,7 +153,7 @@ Make sure you have Node.js version 12 or higher. Node 14 is recommended and supp
 To add the Amazon Chime SDK for JavaScript into an existing application,
 install the package directly from npm:
 
-```
+```plaintext
 npm install amazon-chime-sdk-js --save
 ```
 
@@ -116,6 +163,7 @@ all supported browsers.
 ## Setup
 
 ### Meeting session
+
 Create a meeting session in your client application.
 
 ```js
@@ -176,6 +224,7 @@ These objects contain all the information needed for a client application using 
 The value of the MediaRegion parameter in the createMeeting() should ideally be set to the one of the media regions which is closest to the user creating a meeting. An implementation can be found under the topic 'Choosing the nearest media Region' in the [Amazon Chime SDK Media Regions documentation](https://docs.aws.amazon.com/chime/latest/dg/chime-sdk-meetings-regions.html).
 
 ### Messaging session
+
 Create a messaging session in your client application to receive messages from Amazon Chime SDK for Messaging.
 
 ```js
@@ -199,35 +248,31 @@ const userArn = /* The userArn */;
 const sessionId = /* The sessionId */;
 const configuration = new MessagingSessionConfiguration(userArn, sessionId, endpoint.Endpoint.Url, chime, AWS);
 const messagingSession = new DefaultMessagingSession(configuration, logger);
-
 ```
+
 ## Building and testing
 
-```
+```plaintext
 git fetch --tags https://github.com/aws/amazon-chime-sdk-js
 npm run build
 npm run test
 ```
 
-After running `npm run test` the first time, you can use `npm run test:fast` to
-speed up the test suite.
+After running `npm run test` the first time, you can use `npm run test:fast` to speed up the test suite.
 
 Tags are fetched in order to correctly generate versioning metadata.
 
-To view code coverage results open `coverage/index.html` in your browser
-after running `npm run test`.
+To view code coverage results open `coverage/index.html` in your browser after running `npm run test`.
 
-If you run `npm run test` and the tests are running but the coverage report is not getting generated
-then you might have a resource clean up issue. In Mocha v4.0.0 or newer the implementation was changed so 
-that the Mocha processes will not force exit when the test run is complete. <br /> For example, if you have a 
-`DefaultVideoTransformDevice` in your unit test then you must call `await device.stop();` to clean up the
-resources and not run into this issue. You can also look into the usage of `done();` in the [Mocha documentation](https://mochajs.org/#asynchronous-code). 
+If you run `npm run test` and the tests are running but the coverage report is not getting generated then you might have a resource clean up issue. In Mocha v4.0.0 or newer the implementation was changed so that the Mocha processes will not force exit when the test run is complete.
+
+For example, if you have a `DefaultVideoTransformDevice` in your unit test then you must call `await device.stop();` to clean up the resources and not run into this issue. You can also look into the usage of `done();` in the [Mocha documentation](https://mochajs.org/#asynchronous-code).
 
 ## Generating the documentation
 
 To generate JavaScript API reference documentation run:
 
-```
+```plaintext
 npm run build
 npm run doc
 ```
@@ -324,7 +369,7 @@ const observer = {
   },
 
   audioInputMuteStateChanged: (device, muted) => {
-    console.log('Device', device, muted ? 'is muted in hardware' : 'is not muted);
+    console.log('Device', device, muted ? 'is muted in hardware' : 'is not muted');
   },
 };
 
@@ -515,6 +560,7 @@ meetingSession.audioVideo.subscribeToActiveSpeakerDetector(
 
 > Note: In Chime SDK terms, a video tile is an object containing an attendee ID,
 a video stream, etc. To view a video in your application, you must bind a tile to a `<video>` element.
+>
 > - Make sure you bind a tile to the same video element until the tile is removed.
 > - A local video tile can be identified using `localTile` property.
 > - A tile is created with a new tile ID when the same remote attendee restarts the video.
@@ -677,6 +723,7 @@ meetingSession.audioVideo.addObserver(observer);
 ```
 
 **Use case 17.** Add an observer to know all the remote video sources when changed.
+
 ```js
 const observer = {
   remoteVideoSourcesDidChange: videoSources => {
@@ -689,10 +736,12 @@ const observer = {
 
 meetingSession.audioVideo.addObserver(observer);
 ```
+
 You can also call below method to know all the remote video sources:
 > Note: `getRemoteVideoSources` method is different from `getAllRemoteVideoTiles`,
 `getRemoteVideoSources` returns all the remote video sources that are available to be viewed,
 while `getAllRemoteVideoTiles` returns the ones that are actually being seen.
+
 ```js
 const videoSources = meetingSession.audioVideo.getRemoteVideoSources();
 videoSources.forEach(videoSource => {
@@ -1144,10 +1193,9 @@ messagingSession.start();
 
 ## Notice
 
-The use of Amazon Voice Focus via this SDK involves the downloading and execution of code at runtime by end users.
+The use of Amazon Voice Focus and background blur via this SDK involves the downloading and execution of code at runtime by end users.
 
-The use of Amazon Voice Focus runtime code is subject to additional notices. See [this NOTICES file](https://static.sdkassets.chime.aws/workers/NOTICES.txt) for details. You agree to make these additional notices available to all end users who use Amazon Voice Focus runtime code via this SDK.
-
+The use of Amazon Voice Focus and background blur runtime code is subject to additional notices. See [this Amazon Voice Focus NOTICES file](https://static.sdkassets.chime.aws/workers/NOTICES.txt) and [background blur NOTICES file](https://static.sdkassets.chime.aws/bgblur/workers/NOTICES.txt) for details. You agree to make these additional notices available to all end users who use Amazon Voice Focus and background blur runtime code via this SDK.
 
 The browser demo applications in the [demos directory](https://github.com/aws/amazon-chime-sdk-js/tree/master/demos) use [TensorFlow.js](https://github.com/tensorflow/tfjs) and pre-trained [TensorFlow.js models](https://github.com/tensorflow/tfjs-models) for image segmentation. Use of these third party models involves downloading and execution of code at runtime from [jsDelivr](https://www.jsdelivr.com/) by end user browsers. For the jsDelivr Acceptable Use Policy, please visit this [link](https://www.jsdelivr.com/terms/acceptable-use-policy-jsdelivr-net).
 
