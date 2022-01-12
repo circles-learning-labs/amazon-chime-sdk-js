@@ -13,27 +13,13 @@ import BitrateParameters from './BitrateParameters';
 import ConnectionMetrics from './ConnectionMetrics';
 import SimulcastUplinkObserver from './SimulcastUplinkObserver';
 import SimulcastUplinkPolicy from './SimulcastUplinkPolicy';
-import BandwidthPolicy  from './BandwidthPolicy'; 
-import {ActiveStreams} from './BandwidthPolicyRule'; 
-import BandwidthPolicyRule from './BandwidthPolicyRule'
 
-declare global {
-  // Since any uplink policy we set gets overridden by the chime connect function
-  // we need a way to configure our policy. This is dirty, but we look for teh global variable.
-  // Later, we can pass this in as part of the configuration; but for now we want to be able
-  // to change it on the fly for easy testing.
-  var SELECTED_BANDWIDTH_POLICY : BandwidthPolicy
-}
-
-
-/* Moved to BandwidthPolicyRules.ts
 const enum ActiveStreams {
   kHi,
   kHiAndLow,
   kMidAndLow,
   kLow,
 }
-*/
 
 /**
  * [[DefaultSimulcastUplinkPolicy]] determines capture and encode
@@ -165,14 +151,11 @@ export default class DefaultSimulcastUplinkPolicy implements SimulcastUplinkPoli
         // Also note that due to some uninvestigated logic in bitrate allocation, Chromium
         // will skip the bottom layer if we try setting it to 1200 kbps instead so it will still take a while to
         // recover (as it needs to send padding until it reaches around 1000 kbps).
-      
-      //if (this.numParticipants >= 0 && this.numParticipants <= 2) {
-        // Simulcast disabled
         this.newActiveStreams = ActiveStreams.kHi;
         newBitrates[0].maxBitrateKbps = 0;
         newBitrates[1].maxBitrateKbps = 1200;
         newBitrates[2].maxBitrateKbps = 0;
-      /* else if (
+      } else if (
         this.numSenders <= 4 &&
         this.lastUplinkBandwidthKbps >= DefaultSimulcastUplinkPolicy.kHiDisabledRate
       ) {
@@ -187,27 +170,13 @@ export default class DefaultSimulcastUplinkPolicy implements SimulcastUplinkPoli
         newBitrates[0].maxBitrateKbps = this.lastUplinkBandwidthKbps >= 350 ? 200 : 150;
         newBitrates[1].maxBitrateKbps = this.numSenders <= 6 ? 600 : 350;
         newBitrates[2].maxBitrateKbps = 0;
-      }else {
+      } else {
         // 320x192 + 640x384 + (1280x768)
         this.newActiveStreams = ActiveStreams.kLow;
         newBitrates[0].maxBitrateKbps = 300;
         newBitrates[1].maxBitrateKbps = 0;
         newBitrates[2].maxBitrateKbps = 0;
-      }*/
-	} else {
-        let policy:BandwidthPolicyRule = window.SELECTED_BANDWIDTH_POLICY.FindPolicyMatch(this.numSenders, this.lastUplinkBandwidthKbps );
-        this.newActiveStreams = policy.ActiveStreams()
-        newBitrates[0].maxBitrateKbps = policy.lowStreamBitrate
-        newBitrates[1].maxBitrateKbps = policy.mediumStreamBitrate
-        newBitrates[2].maxBitrateKbps = policy.highStreamBitrate
       }
-
-      let policy:BandwidthPolicyRule = window.SELECTED_BANDWIDTH_POLICY.FindPolicyMatch(this.numSenders, this.lastUplinkBandwidthKbps );
-      this.newActiveStreams = policy.ActiveStreams()
-      newBitrates[0].maxBitrateKbps = policy.lowStreamBitrate
-      newBitrates[1].maxBitrateKbps = policy.mediumStreamBitrate
-      newBitrates[2].maxBitrateKbps = policy.highStreamBitrate
-
       const bitrates: number[] = newBitrates.map((v, _i, _a) => {
         return v.maxBitrateKbps;
       });
